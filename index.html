@@ -41,12 +41,12 @@
             color: #2563EB;
             background-color: #DBEAFE; /* blue-100 */
         }
-        /* (BARU) Sembunyikan butiran aset secara lalai & transisi */
+        /* (DIBETULKAN) Sembunyikan butiran aset (tiada padding) */
         .asset-details {
             max-height: 0;
             overflow: hidden;
             transition: max-height 0.3s ease-out;
-            background-color: #FAFAFA; /* Sedikit kelabu */
+            /* Latar belakang & padding dialihkan ke div DALAM */
         }
         .asset-item-details.open .asset-details {
             max-height: 500px; /* Cukup besar untuk gambar & spec */
@@ -344,7 +344,7 @@
                 <details class="border border-gray-200 rounded-lg bg-white">
                     <summary class="flex justify-between items-center p-4 cursor-pointer bg-gray-50 hover:bg-gray-100 rounded-t-lg">
                         <h3 class="text-lg font-semibold text-gray-800">Urus Aset Sedia Ada</h3>
-                        <svg class="w-6 h-6 text-gray-600 transition-transform duration-200 transform group-open:rotate-90" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.08l.738-.46c.477-.298 1.043-.182 1.39.288l.548.74c.346.47.32.1.05.1l-.738.46c-.35.22-.564.606-.564 1.03v1.093c0 .424.214.81.564 1.03l.738.46c.47.29.527.92.18 1.39l-.548.74c-.347.47-.913.587-1.39.288l-.738-.46c-.35-.22-.806-.242-1.205-.08-.396.164-.71.506-.78.93l-.149.894c-.09.542-.56.94-1.11.94h-1.093c-.55 0-1.02-.398-1.11-.94l-.149-.894c-.07-.424-.384-.764-.78-.93-.398-.164-.855-.142-1.205.08l-.738.46c-.477.298-1.043.182-1.39-.288l-.548-.74c-.346-.47-.32-1.042.05-1.39l.738-.46c.35-.22.564-.606-.564-1.03V9.093c0-.424-.214-.81-.564-1.03l-.738-.46c-.47-.29-.527-.92-.18-1.39l.548-.74c.347-.47.913.587 1.39.288l.738.46c.35.22.806.242 1.205.08.396.164.71.506.78.93l.149.894z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                        <svg class="w-6 h-6 text-gray-600 transition-transform duration-200 transform group-open:rotate-90" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.08l.738-.46c.477-.298 1.043-.182 1.39.288l.548.74c.346.47.32.1.05.1l-.738.46c-.35.22-.564.606-.564 1.03v1.093c0 .424.214.81.564 1.03l.738.46c.47.29.527.92.18 1.39l-.548.74c-.347.47-.913.587-1.39.288l-.738-.46c-.35-.22-.806-.242-1.205-.08-.396.164-.71.506-.78.93l-.149.894c-.09.542-.56.94-1.11.94h-1.093c-.55 0-1.02-.398-1.11-.94l-.149-.894c-.07-.424-.384-.764-.78-.93-.398-.164-.855-.142-1.205.08l-.738.46c-.477.298-1.043.182-1.39-.288l-.548-.74c-.346-.47-.32-1.042.05-1.39l.738-.46c.35-.22.564-.606-.564-1.03V9.093c0-.424-.214-.81-.564-1.03l-.738-.46c-.47-.29-.527-.92-.18-1.39l.548-.74c.347.47.913.587 1.39.288l.738.46c.35.22.806.242 1.205.08.396.164.71.506.78.93l.149.894z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                     </summary>
                     <div class="p-4">
                         <p class="text-sm text-gray-600 mb-3">Edit nama, kategori, URL gambar, atau spesifikasi untuk aset sedia ada.</p>

@@ -41,12 +41,12 @@
             color: #2563EB;
             background-color: #DBEAFE; /* blue-100 */
         }
-        /* (DIBETULKAN) Sembunyikan butiran aset (tiada padding) */
+        /* (DIBETULKAN) Sembunyikan butiran aset (tiada padding/latar belakang) */
         .asset-details {
             max-height: 0;
             overflow: hidden;
             transition: max-height 0.3s ease-out;
-            /* Latar belakang & padding dialihkan ke div DALAM */
+            /* Latar belakang & padding dialihkan ke div DALAM (dalam script.js) */
         }
         .asset-item-details.open .asset-details {
             max-height: 500px; /* Cukup besar untuk gambar & spec */

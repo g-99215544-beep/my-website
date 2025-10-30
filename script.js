@@ -224,8 +224,8 @@ window.addEventListener('DOMContentLoaded', () => {
             rekodTabPanel.appendChild(adminPanel);
             adminPanel.classList.remove('hidden');
             
-            // Tetapkan tab "Aset Tersedia" sebagai lalai untuk admin
-            showTab('aset'); 
+            // (DIBETULKAN) Tetapkan tab "Rekod Pinjaman" sebagai lalai untuk admin
+            showTab('rekod'); 
         } else {
             // Paparan GURU (Anonymous)
             loginButton.classList.remove('hidden');
@@ -438,6 +438,10 @@ window.addEventListener('DOMContentLoaded', () => {
             // (DIBETULKAN) Tambah event listener untuk toggle butiran (info) aset
             document.querySelectorAll('.asset-info-toggle').forEach(btn => {
                 btn.addEventListener('click', (e) => {
+                    // Jangan 'toggle' jika klik di atas label checkbox
+                    if (e.target.closest('label[for^="item-"]')) {
+                        return;
+                    }
                     const itemDetails = e.target.closest('.asset-item-details');
                     if (itemDetails) {
                         itemDetails.classList.toggle('open');
@@ -621,6 +625,7 @@ window.addEventListener('DOMContentLoaded', () => {
         `;
 
         // Bahagian butiran (Info)
+        // (DIBETULKAN) Tambah padding & bg di sini
         const detailsHtml = `
             <div class="asset-details">
                 <div class="p-3 bg-gray-50 border-t border-gray-200">

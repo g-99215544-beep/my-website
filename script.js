@@ -435,7 +435,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 }
             }
             
-            // Tambah event listener untuk toggle butiran (info) aset
+            // (DIBETULKAN) Tambah event listener untuk toggle butiran (info) aset
             document.querySelectorAll('.asset-info-toggle').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const itemDetails = e.target.closest('.asset-item-details');
@@ -502,7 +502,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * (BARU) Memaparkan SATU item individu
+     * (BARU & DIBETULKAN) Memaparkan SATU item individu
      * @param {object} item - Objek aset
      * @param {boolean} includeCheckbox - Sama ada mahu letak checkbox (untuk tab borang)
      * @returns {HTMLElement} - Elemen DOM untuk item
@@ -556,31 +556,35 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         
         // Bahagian butiran (Info)
+        // (DIBETULKAN) Tambah padding & bg di sini, bukan di CSS
         const detailsHtml = `
-            <div class="asset-details p-3 border-t border-green-200">
-                <div class="flex space-x-3">
-                    ${imageHtml}
-                    <div>
-                        <h4 class="font-semibold text-sm text-gray-700">Spesifikasi:</h4>
-                        ${specsHtml ? `<ul class="list-none mt-1">${specsHtml}</ul>` : '<p class="text-xs text-gray-500 italic">Tiada spesifikasi.</p>'}
+            <div class="asset-details">
+                <div class="p-3 border-t border-green-200 bg-gray-50">
+                    <div class="flex space-x-3">
+                        ${imageHtml}
+                        <div>
+                            <h4 class="font-semibold text-sm text-gray-700">Spesifikasi:</h4>
+                            ${specsHtml ? `<ul class="list-none mt-1">${specsHtml}</ul>` : '<p class="text-xs text-gray-500 italic">Tiada spesifikasi.</p>'}
+                        </div>
                     </div>
                 </div>
             </div>
         `;
 
         // Butang Info (hanya jika ada gambar atau spec)
-        const infoButtonHtml = (item.imageUrl || item.specs) ? `
-            <button class="asset-info-toggle p-3 text-blue-600 hover:text-blue-800">
+        // (DIBETULKAN) Jadikan keseluruhan <summary> boleh diklik
+        const infoIconHtml = (item.imageUrl || item.specs) ? `
+            <span class="p-3 text-blue-600">
                 <svg class="w-5 h-5 transition-transform duration-200 info-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                 </svg>
-            </button>
-        ` : '<div class="w-11"></div>'; // Placeholder
+            </span>
+        ` : '<div class="w-11 p-3"></div>'; // Placeholder
 
         element.innerHTML = `
-            <div class="flex justify-between items-center">
+            <div class="flex justify-between items-stretch asset-info-toggle ${(item.imageUrl || item.specs) ? 'cursor-pointer' : ''}">
                 <div class="flex-grow">${mainContentHtml}</div>
-                ${infoButtonHtml}
+                ${infoIconHtml}
             </div>
             ${(item.imageUrl || item.specs) ? detailsHtml : ''}
         `;
@@ -589,7 +593,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     
     /**
-     * (BARU) Memaparkan KUMPULAN item (cth: Joi Classmate 1-34)
+     * (BARU & DIBETULKAN) Memaparkan KUMPULAN item (cth: Joi Classmate 1-34)
      * @param {object} group - Objek kumpulan { groupName, items }
      * @param {boolean} includeCheckbox - Sama ada mahu letak checkbox (untuk tab borang)
      * @returns {HTMLElement} - Elemen DOM untuk kumpulan
@@ -619,39 +623,42 @@ window.addEventListener('DOMContentLoaded', () => {
         `;
 
         // Bahagian butiran (Info)
+        // (DIBETULKAN) Tambah padding & bg di sini
         const detailsHtml = `
-            <div class="asset-details p-3">
-                <div class="flex space-x-3">
-                    ${imageHtml}
-                    <div>
-                        <h4 class="font-semibold text-sm text-gray-700">Spesifikasi Kumpulan:</h4>
-                        ${specsHtml ? `<ul class="list-none mt-1">${specsHtml}</ul>` : '<p class="text-xs text-gray-500 italic">Tiada spesifikasi.</p>'}
+            <div class="asset-details">
+                <div class="p-3 bg-gray-50 border-t border-gray-200">
+                    <div class="flex space-x-3">
+                        ${imageHtml}
+                        <div>
+                            <h4 class="font-semibold text-sm text-gray-700">Spesifikasi Kumpulan:</h4>
+                            ${specsHtml ? `<ul class="list-none mt-1">${specsHtml}</ul>` : '<p class="text-xs text-gray-500 italic">Tiada spesifikasi.</p>'}
+                        </div>
                     </div>
-                </div>
-                <h4 class="font-semibold text-sm text-gray-700 mt-4 mb-2">Pilih Item:</h4>
-                <div class="grouped-item-grid p-2 bg-gray-50 rounded-md max-h-48 overflow-y-auto">
-                    ${availableItemsInGroup.map(item => {
-                        const itemName = (item.name || 'Aset Rosak');
-                        const checkboxId = `item-${item.id}`;
-                        if (includeCheckbox) {
-                            // Ini untuk tab "Permohonan"
-                            return `
-                                <label for="${checkboxId}" class="flex items-center space-x-2 p-2 rounded-md hover:bg-gray-200 cursor-pointer">
-                                    <input type="checkbox" id="${checkboxId}" name="selectedItems" value="${item.id}" data-name="${itemName}"
-                                           class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 asset-checkbox">
-                                    <span class="text-sm text-green-800 break-words">${itemName}</span>
-                                </label>
-                            `;
-                        } else {
-                            // Ini untuk tab "Aset Tersedia (Paparan Sahaja)"
-                            return `
-                                <div class="flex items-center space-x-2 p-2">
-                                    <span class="h-4 w-4"></span> <!-- Placeholder untuk samakan 'alignment' -->
-                                    <span class="text-sm text-green-800 break-words">${itemName}</span>
-                                </div>
-                            `;
-                        }
-                    }).join('')}
+                    <h4 class="font-semibold text-sm text-gray-700 mt-4 mb-2">Pilih Item:</h4>
+                    <div class="grouped-item-grid p-2 bg-gray-100 rounded-md max-h-48 overflow-y-auto">
+                        ${availableItemsInGroup.map(item => {
+                            const itemName = (item.name || 'Aset Rosak');
+                            const checkboxId = `item-${item.id}`;
+                            if (includeCheckbox) {
+                                // Ini untuk tab "Permohonan"
+                                return `
+                                    <label for="${checkboxId}" class="flex items-center space-x-2 p-2 rounded-md hover:bg-gray-200 cursor-pointer">
+                                        <input type="checkbox" id="${checkboxId}" name="selectedItems" value="${item.id}" data-name="${itemName}"
+                                               class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 asset-checkbox">
+                                        <span class="text-sm text-green-800 break-words">${itemName}</span>
+                                    </label>
+                                `;
+                            } else {
+                                // Ini untuk tab "Aset Tersedia (Paparan Sahaja)"
+                                return `
+                                    <div class="flex items-center space-x-2 p-2">
+                                        <span class="h-4 w-4"></span> <!-- Placeholder untuk samakan 'alignment' -->
+                                        <span class="text-sm text-green-800 break-words">${itemName}</span>
+                                    </div>
+                                `;
+                            }
+                        }).join('')}
+                    </div>
                 </div>
             </div>
         `;
@@ -1356,6 +1363,7 @@ window.addEventListener('DOMContentLoaded', () => {
             category: editAssetCategory.value,
             imageUrl: editAssetImageUrl.value || null,
             specs: editAssetSpecs.value || null
+            // groupName tidak diubah di sini, hanya di "Tambah Pukal"
         };
         
         try {
@@ -1645,6 +1653,8 @@ window.addEventListener('DOMContentLoaded', () => {
     addAdminButtonListeners();
     // Tetapkan tarikh minimum pada borang
     setMinDates();
+    // Mulakan borang permohonan
+    loanForm.addEventListener('submit', handleFormSubmit);
 
 }); // <-- Kurungan penutup untuk DOMContentLoaded
 

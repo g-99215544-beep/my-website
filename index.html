@@ -162,54 +162,58 @@
                         <div class="bg-white shadow-md rounded-lg p-6">
                             <h2 class="text-xl font-semibold mb-4 text-green-600">Pilih Item (Boleh Tanda Banyak)</h2>
                             <div class="space-y-2">
-                                <!-- Kategori Laptop -->
-                                <div class="border border-gray-200 rounded-lg">
-                                    <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg">
+                                <!-- (DIBETULKAN) Kategori Laptop (guna <details>) -->
+                                <details class="border border-gray-200 rounded-lg">
+                                    <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg cursor-pointer">
                                         <div class="flex items-center space-x-2">
                                             <span class="text-lg font-semibold text-gray-800">Laptop</span>
                                             <span id="form-laptop-count" class="hidden ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-blue-100 bg-blue-600 rounded-full">0</span>
                                         </div>
+                                        <svg class="w-5 h-5 text-gray-600 transition-transform duration-200 transform group-open:rotate-180" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
                                     </summary>
                                     <div id="form-laptop-list" class="space-y-2 p-4">
                                         <p class="text-gray-500 text-sm italic">Memuatkan...</p>
                                     </div>
-                                </div>
-                                <!-- Kategori Tablet -->
-                                <div class="border border-gray-200 rounded-lg">
-                                    <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg">
+                                </details>
+                                <!-- (DIBETULKAN) Kategori Tablet (guna <details>) -->
+                                <details class="border border-gray-200 rounded-lg">
+                                    <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg cursor-pointer">
                                         <div class="flex items-center space-x-2">
                                             <span class="text-lg font-semibold text-gray-800">Tablet</span>
                                             <span id="form-tablet-count" class="hidden ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-blue-100 bg-blue-600 rounded-full">0</span>
                                         </div>
+                                        <svg class="w-5 h-5 text-gray-600 transition-transform duration-200 transform group-open:rotate-180" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
                                     </summary>
                                     <div id="form-tablet-list" class="space-y-2 p-4">
                                         <p class="text-gray-500 text-sm italic">Memuatkan...</p>
                                     </div>
-                                </div>
-                                <!-- Kategori Projector -->
-                                <div class="border border-gray-200 rounded-lg">
-                                    <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg">
+                                </details>
+                                <!-- (DIBETULKAN) Kategori Projector (guna <details>) -->
+                                <details class="border border-gray-200 rounded-lg">
+                                    <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg cursor-pointer">
                                         <div class="flex items-center space-x-2">
                                             <span class="text-lg font-semibold text-gray-800">Projector</span>
                                             <span id="form-projector-count" class="hidden ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-blue-100 bg-blue-600 rounded-full">0</span>
                                         </div>
+                                        <svg class="w-5 h-5 text-gray-600 transition-transform duration-200 transform group-open:rotate-180" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
                                     </summary>
                                     <div id="form-projector-list" class="space-y-2 p-4">
                                         <p class="text-gray-500 text-sm italic">Memuatkan...</p>
                                     </div>
-                                </div>
-                                <!-- Kategori Lain-lain -->
-                                <div class="border border-gray-200 rounded-lg">
-                                    <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg">
+                                </details>
+                                <!-- (DIBETULKAN) Kategori Lain-lain (guna <details>) -->
+                                <details class="border border-gray-200 rounded-lg">
+                                    <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg cursor-pointer">
                                         <div class="flex items-center space-x-2">
                                             <span class="text-lg font-semibold text-gray-800">Lain-lain</span>
                                             <span id="form-others-count" class="hidden ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-blue-100 bg-blue-600 rounded-full">0</span>
                                         </div>
+                                        <svg class="w-5 h-5 text-gray-600 transition-transform duration-200 transform group-open:rotate-180" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
                                     </summary>
                                     <div id="form-others-list" class="space-y-2 p-4">
                                         <p class="text-gray-500 text-sm italic">Memuatkan...</p>
                                     </div>
-                                </div>
+                                </details>
                             </div>
                         </div>
                     </section>
@@ -222,54 +226,58 @@
                     <div class="bg-white shadow-md rounded-lg p-6">
                         <h2 class="text-xl font-semibold mb-4 text-green-600">Senarai Aset Tersedia (Paparan Sahaja)</h2>
                         <div class="space-y-2">
-                            <!-- Kategori Laptop -->
-                            <div class="border border-gray-200 rounded-lg">
-                                <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg">
+                            <!-- (DIBETULKAN) Kategori Laptop (guna <details>) -->
+                            <details class="border border-gray-200 rounded-lg">
+                                <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg cursor-pointer">
                                     <div class="flex items-center space-x-2">
                                         <span class="text-lg font-semibold text-gray-800">Laptop</span>
                                         <span id="display-laptop-count" class="hidden ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-blue-100 bg-blue-600 rounded-full">0</span>
                                     </div>
+                                    <svg class="w-5 h-5 text-gray-600 transition-transform duration-200 transform group-open:rotate-180" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
                                 </summary>
                                 <div id="display-laptop-list" class="space-y-2 p-4">
                                     <p class="text-gray-500 text-sm italic">Memuatkan...</p>
                                 </div>
-                            </div>
-                            <!-- Kategori Tablet -->
-                            <div class="border border-gray-200 rounded-lg">
-                                <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg">
+                            </details>
+                            <!-- (DIBETULKAN) Kategori Tablet (guna <details>) -->
+                            <details class="border border-gray-200 rounded-lg">
+                                <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg cursor-pointer">
                                     <div class="flex items-center space-x-2">
                                         <span class="text-lg font-semibold text-gray-800">Tablet</span>
                                         <span id="display-tablet-count" class="hidden ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-blue-100 bg-blue-600 rounded-full">0</span>
                                     </div>
+                                    <svg class="w-5 h-5 text-gray-600 transition-transform duration-200 transform group-open:rotate-180" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
                                 </summary>
                                 <div id="display-tablet-list" class="space-y-2 p-4">
                                     <p class="text-gray-500 text-sm italic">Memuatkan...</p>
                                 </div>
-                            </div>
-                            <!-- Kategori Projector -->
-                            <div class="border border-gray-200 rounded-lg">
-                                <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg">
+                            </details>
+                            <!-- (DIBETULKAN) Kategori Projector (guna <details>) -->
+                            <details class="border border-gray-200 rounded-lg">
+                                <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg cursor-pointer">
                                     <div class="flex items-center space-x-2">
                                         <span class="text-lg font-semibold text-gray-800">Projector</span>
                                         <span id="display-projector-count" class="hidden ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-blue-100 bg-blue-600 rounded-full">0</span>
                                     </div>
+                                    <svg class="w-5 h-5 text-gray-600 transition-transform duration-200 transform group-open:rotate-180" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
                                 </summary>
                                 <div id="display-projector-list" class="space-y-2 p-4">
                                     <p class="text-gray-500 text-sm italic">Memuatkan...</p>
                                 </div>
-                            </div>
-                            <!-- Kategori Lain-lain -->
-                            <div class="border border-gray-200 rounded-lg">
-                                <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg">
+                            </details>
+                            <!-- (DIBETULKAN) Kategori Lain-lain (guna <details>) -->
+                            <details class="border border-gray-200 rounded-lg">
+                                <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg cursor-pointer">
                                     <div class="flex items-center space-x-2">
                                         <span class="text-lg font-semibold text-gray-800">Lain-lain</span>
                                         <span id="display-others-count" class="hidden ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-blue-100 bg-blue-600 rounded-full">0</span>
                                     </div>
+                                    <svg class="w-5 h-5 text-gray-600 transition-transform duration-200 transform group-open:rotate-180" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
                                 </summary>
                                 <div id="display-others-list" class="space-y-2 p-4">
                                     <p class="text-gray-500 text-sm italic">Memuatkan...</p>
                                 </div>
-                            </div>
+                            </details>
                         </div>
                     </div>
                 </section>

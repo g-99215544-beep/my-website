@@ -571,7 +571,6 @@ window.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
 
-        // Butang Info (hanya jika ada gambar atau spec)
         // (DIBETULKAN) Jadikan keseluruhan <summary> boleh diklik
         const infoIconHtml = (item.imageUrl || item.specs) ? `
             <span class="p-3 text-blue-600">
@@ -737,7 +736,7 @@ window.addEventListener('DOMContentLoaded', () => {
                         <p class="font-semibold text-red-800">${item.itemName}</p>
                         <p class="text-sm text-gray-700">Peminjam: ${item.teacherName}</p>
                         <p class="text-sm text-gray-700">Pulang: ${formatDate(item.endDate)}</p>
-                        <p class="text-sm text-gray-500 italic">Lulus oleh: ${item.approvedBy || 'N/A'}</p>
+                        <p class="text-sm text-gray-500 italic">Lulus oleh: ${loan.approvedBy || 'N/A'}</p>
                     </div>
                     <div class="mt-3 text-center border-t border-red-200 pt-3">
                         ${countdownHtml}

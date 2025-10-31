@@ -448,21 +448,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 </button>
                 <div class="accordion-content p-5 border-t border-gray-200 hidden">
                     <form id="add-asset-form" class="space-y-4">
-                        <div>
-                            <label for="asset-name" class="block text-sm font-medium text-gray-700">Nama Aset</label>
-                            <input type="text" id="asset-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
-                        </div>
-                        <div>
-                            <label for="asset-category" class="block text-sm font-medium text-gray-700">Kategori</label>
-                            <select id="asset-category" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
-                                <option value="Laptop">Laptop</option>
-                                <option value="Tablet">Tablet</option>
-                                <option value="Projector">Projector</option>
-                                <option value="Lain-lain">Lain-lain</option>
-                            </select>
+                        <!-- (DIUBAH) Borang kini untuk tambah pukal -->
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div class="md:col-span-2">
+                                <label for="asset-base-name" class="block text-sm font-medium text-gray-700">Nama Asas</label>
+                                <input type="text" id="asset-base-name" placeholder="Cth: Tablet Makmal" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            </div>
+                            <div>
+                                <label for="asset-quantity" class="block text-sm font-medium text-gray-700">Jumlah</label>
+                                <input type="number" id="asset-quantity" placeholder="Cth: 10" min="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            </div>
+                            <div>
+                                <label for="asset-category" class="block text-sm font-medium text-gray-700">Kategori</label>
+                                <select id="asset-category" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                                    <option value="">Pilih Kategori</option>
+                                    <option value="Laptop">Laptop</option>
+                                    <option value="Tablet">Tablet</option>
+                                    <option value="Projector">Projector</option>
+                                    <option value="Lain-lain">Lain-lain</option>
+                                </select>
+                            </div>
                         </div>
                         <button type="submit" class="rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700">
-                            Tambah Aset
+                            Tambah Aset Pukal
                         </button>
                     </form>
                 </div>
@@ -731,28 +739,74 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * Mengendalikan HANTAR BORANG TAMBAH ASET (Admin)
+     * (DIUBAH) Kini mengendalikan penambahan aset pukal
      */
     async function handleAssetSubmit(event) {
         event.preventDefault();
-        const { collection, addDoc } = window.firebase;
+        // Perlukan 'collection', 'doc', dan 'writeBatch' dari Firebase
+        const { collection, doc, writeBatch } = window.firebase;
 
-        const assetName = document.getElementById('asset-name').value;
-        const assetCategory = document.getElementById('asset-category').value;
+        const baseName = document.getElementById('asset-base-name').value;
+        const quantityInput = document.getElementById('asset-quantity').value;
+        const category = document.getElementById('asset-category').value;
+
+        if (!baseName || !quantityInput || !category) {
+            alert("Sila isi semua ruangan: Nama Asas, Jumlah, dan Kategori.");
+            return;
+        }
+
+        const quantity = parseInt(quantityInput, 10);
+
+        if (isNaN(quantity) || quantity < 1) {
+            alert("Jumlah mesti nombor yang sah dan sekurang-kurangnya 1.");
+            return;
+        }
+        
+        if (quantity > 100) {
+            // Pengehadan untuk elak batch terlalu besar
+            alert("Tidak boleh menambah lebih dari 100 aset sekaligus. Sila masukkan jumlah yang lebih kecil.");
+            return;
+        }
+        
+        // Dapatkan pengesahan
+        if (!confirm(`Anda akan menambah ${quantity} aset dengan nama asas "${baseName}".\n\nContoh: "${baseName} 1", "${baseName} 2", ...\n\nTeruskan?`)) {
+            return; // Batal jika pengguna tekan 'Cancel'
+        }
+
+        const submitButton = event.target.querySelector('button[type="submit"]');
 
         try {
+            // Tunjukkan 'loading'
+            submitButton.disabled = true;
+            submitButton.textContent = 'Memproses...';
+
+            const batch = writeBatch(db);
             const assetsCollection = collection(db, `/artifacts/${appId}/public/data/assets`);
-            await addDoc(assetsCollection, {
-                name: assetName,
-                category: assetCategory,
-                status: 'available' // Status lalai
-            });
+
+            for (let i = 1; i <= quantity; i++) {
+                const newAssetName = `${baseName} ${i}`;
+                const newAssetRef = doc(assetsCollection); // Cipta rujukan dokumen baru
+                
+                batch.set(newAssetRef, {
+                    name: newAssetName,
+                    category: category,
+                    status: 'available' // Status lalai
+                });
+            }
             
-            alert("Aset berjaya ditambah!");
+            await batch.commit(); // Hantar semua aset ke Firestore
+            
+            alert(`Berjaya! ${quantity} aset baru telah ditambah.`);
             event.target.reset();
-            // renderApp() akan dipanggil oleh onSnapshot
+            // onSnapshot akan kemaskini UI secara automatik
+            
         } catch (error) {
-            console.error("Ralat menambah aset:", error);
-            alert("Gagal menambah aset.");
+            console.error("Ralat menambah aset pukal:", error);
+            alert("Gagal menambah aset. Sila semak konsol untuk ralat.");
+        } finally {
+            // Pulihkan butang
+            submitButton.disabled = false;
+            submitButton.textContent = 'Tambah Aset Pukal';
         }
     }
     
@@ -947,4 +1001,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 });
+
 

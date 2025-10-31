@@ -43,20 +43,15 @@ const closeLoginModalBtn = document.getElementById('close-login-modal');
 
 // Fungsi ini dipanggil apabila DOM selesai dimuatkan
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Inisialisasi semua tab
-    initTabPermohonan(db);
-    initTabAset();
-    initTabDipinjam();
-    initTabRekod(db);
-    
-    // 2. Sediakan pendengar acara utama
+    // 1. (FIX) Sediakan pendengar acara UI dahulu. Ini selamat dan tidak perlukan db.
     tabNav.addEventListener('click', handleTabClick);
     loginButton.addEventListener('click', () => loginModal.classList.remove('hidden'));
     logoutButton.addEventListener('click', handleLogout);
     closeLoginModalBtn.addEventListener('click', () => loginModal.classList.add('hidden'));
     loginForm.addEventListener('submit', handleLogin);
     
-    // 3. Mulakan sambungan Firebase
+    // 2. Mulakan sambungan Firebase
+    //    Fungsi ini akan menguruskan inisialisasi tab selepas db bersedia
     connectToFirebase();
 });
 
@@ -69,16 +64,22 @@ async function connectToFirebase() {
         // 1. Inisialisasi Firebase
         const app = initializeApp(firebaseConfig);
         auth = getAuth(app);
-        db = getFirestore(app);
+        db = getFirestore(app); // <-- 'db' kini wujud
         
-        // 2. Pasang pendengar Auth
-        setupAuthListeners();
+        // 2. (FIX) Panggil init function SELEPAS db wujud
+        initTabPermohonan(db);
+        initTabAset();
+        initTabDipinjam();
+        initTabRekod(db);
 
-        // 3. Berikan 'db' kepada modul utiliti
+        // 3. Pasang pendengar Auth
+        setupAuthListeners(appId); // Hantar appId ke pendengar
+
+        // 4. Berikan 'db' kepada modul utiliti
         setUtilsDb(db);
         
-        // 4. Mulakan pendengar (listener) untuk nama sekolah
-        listenSchoolInfo();
+        // 5. Mulakan pendengar (listener) untuk nama sekolah
+        listenSchoolInfo(appId); // Hantar appId
 
     } catch (error) {
         console.error("Ralat Inisialisasi Firebase:", error);
@@ -90,7 +91,7 @@ async function connectToFirebase() {
 
 // === PENGURUSAN AUTENTIKASI (AUTH) ===
 
-function setupAuthListeners() {
+function setupAuthListeners(appId) { // Terima appId
     // Dapatkan token auth (disediakan oleh Canvas)
     const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
@@ -110,7 +111,7 @@ function setupAuthListeners() {
             showAdminPanel(isAdmin);
             
             // Pasang pendengar (listeners) Firestore
-            attachFirestoreListeners(appId, user.uid);
+            attachFirestoreListeners(appId, user.uid); // Hantar appId
             
         } else {
             // Tiada pengguna / Log keluar
@@ -200,15 +201,14 @@ function attachFirestoreListeners(appId, userId) {
     detachFirestoreListeners();
 
     // 1. Pendengar untuk Aset (Koleksi Awam)
-    // Laluan: /artifacts/{appId}/public/data/assets
-    const assetsPath = `assets`; // Dipermudahkan untuk pembangunan
-    // (FIX) Buang orderBy('name') untuk mengelakkan ralat indeks
+    // (FIX) Gunakan appId untuk laluan (path) yang betul
+    const assetsPath = `artifacts/${appId}/public/data/assets`;
     const assetsQuery = query(collection(db, assetsPath)); 
     
     assetsListener = onSnapshot(assetsQuery, (snapshot) => {
         let assets = snapshot.docs.map(doc => ({ id: doc.id, data: doc.data() }));
         
-        // (FIX) Isih (sort) di sini menggunakan JavaScript
+        // Isih (sort) di sini menggunakan JavaScript
         assets.sort((a, b) => {
             const nameA = a.data.name.toLowerCase();
             const nameB = b.data.name.toLowerCase();
@@ -228,8 +228,8 @@ function attachFirestoreListeners(appId, userId) {
     });
 
     // 2. Pendengar untuk Pinjaman (Koleksi Awam)
-    // Laluan: /artifacts/{appId}/public/data/loans
-    const loansPath = `loans`; // Dipermudahkan untuk pembangunan
+    // (FIX) Gunakan appId untuk laluan (path) yang betul
+    const loansPath = `artifacts/${appId}/public/data/loans`;
     const loansQuery = query(collection(db, loansPath)); // Ambil semua
     
     loansListener = onSnapshot(loansQuery, (snapshot) => {
@@ -258,8 +258,9 @@ function detachFirestoreListeners() {
 }
 
 // Pendengar untuk Maklumat Sekolah (Nama Sekolah)
-function listenSchoolInfo() {
-    const schoolInfoPath = `school_info/details`; // Dipermudahkan
+function listenSchoolInfo(appId) { // Terima appId
+    // (FIX) Gunakan appId untuk laluan (path) yang betul
+    const schoolInfoPath = `artifacts/${appId}/public/data/school_info/details`;
     
     schoolInfoListener = onSnapshot(doc(db, schoolInfoPath), (doc) => {
         if (doc.exists()) {
@@ -269,9 +270,13 @@ function listenSchoolInfo() {
                 // Kemas kini juga tajuk dokumen
                 document.title = `Sistem Pinjaman ICT - ${schoolName}`;
             }
+        } else {
+            // Jika tiada nama sekolah, tetapkan nama 'default'
+            document.getElementById('school-name').textContent = "SISTEM PINJAMAN ASET ICT";
         }
     }, (error) => {
         console.error("Ralat memuatkan info sekolah: ", error);
+        document.getElementById('school-name').textContent = "SISTEM PINJAMAN ASET ICT";
     });
 }
 

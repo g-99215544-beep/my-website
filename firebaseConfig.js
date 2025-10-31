@@ -9,18 +9,6 @@ const firebaseConfig = {
   measurementId: "G-QKRJ0G00ZN"
 };
 
-// Import fungsi utama dari Firebase (melalui tetingkap global)
-const { 
-    initializeApp 
-} = window.firebase;
-
-// Inisialisasi Firebase
-let app;
-try {
-    app = initializeApp(firebaseConfig);
-} catch (e) {
-    console.error("Ralat inisialisasi Firebase:", e);
-}
-
-export { firebaseConfig, app };
+// Fail ini kini hanya mengeksport objek konfigurasi
+export { firebaseConfig };
 

@@ -1,3 +1,4 @@
+// Untuk Firebase JS SDK v7.20.0 dan ke atas, measurementId adalah pilihan
 const firebaseConfig = {
   apiKey: "AIzaSyAQqc9khxreshF4LJVcRtigVqQNd0g-g3g",
   authDomain: "sistempengurusan-aset-ict-sksa.firebaseapp.com",

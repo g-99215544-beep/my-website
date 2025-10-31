@@ -1,61 +1,101 @@
-// === TABDIPINJAM.JS ===
-// Menguruskan semua logik untuk Tab 3: Aset Dipinjam
-
 // Rujukan DOM
-const borrowedListContainer = document.getElementById('borrowed-list');
+const borrowedAssetList = document.getElementById('borrowed-asset-list');
+const borrowedAssetLoading = document.getElementById('borrowed-asset-loading');
+const borrowedAssetFilter = document.getElementById('borrowed-asset-filter');
 
-// Fungsi utama untuk memulakan tab ini
+let allLoans = []; // Simpan semua pinjaman di sini
+
+// Fungsi untuk memulakan tab
 export function initTabDipinjam() {
-    // Tiada persediaan khusus diperlukan untuk tab ini setakat ini
+    borrowedAssetFilter.addEventListener('input', (e) => {
+        filterAndDisplayLoans(e.target.value);
+    });
 }
 
-// Kemas kini senarai aset apabila cache global berubah
+// Fungsi untuk menerima kemas kini pinjaman dari script.js
 export function updateAsetDipinjam(loans) {
-    
-    // 1. Tapis pinjaman yang sedang aktif (Approved)
-    const activeLoans = loans.filter(loan => loan.data.status === 'Approved');
+    allLoans = loans;
+    filterAndDisplayLoans(borrowedAssetFilter.value);
+}
 
-    if (activeLoans.length === 0) {
-        borrowedListContainer.innerHTML = '<p class="text-gray-500 text-sm italic col-span-full">Tiada aset yang sedang dipinjam pada masa ini.</p>';
-        return;
-    }
-    
-    // 2. Kosongkan senarai
-    borrowedListContainer.innerHTML = '';
-    
-    // 3. Isih mengikut tarikh pulang (paling awal)
-    activeLoans.sort((a, b) => new Date(a.data.endDate) - new Date(b.data.endDate));
+// Fungsi untuk menapis dan memaparkan pinjaman
+function filterAndDisplayLoans(searchTerm) {
+    borrowedAssetLoading.classList.add('hidden');
+    borrowedAssetList.innerHTML = '';
 
-    // 4. Jana HTML untuk setiap pinjaman aktif
-    activeLoans.forEach(loan => {
-        const data = loan.data;
+    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+
+    // Tapis pinjaman yang 'Approved' (sedang dipinjam) SAHAJA
+    const activeLoans = allLoans.filter(loan => loan.data.status === 'Approved');
+
+    // Tapis lebih lanjut berdasarkan carian
+    const filteredLoans = activeLoans.filter(loan => {
+        const name = loan.data.applicantName?.toLowerCase() || '';
+        const ic = loan.data.applicantIC || '';
         
-        // Semak jika tarikh pulang telah tamat
-        const isOverdue = new Date(data.endDate) < new Date();
-        const borderColor = isOverdue ? 'border-red-400' : 'border-gray-200';
-        const bgColor = isOverdue ? 'bg-red-50' : 'bg-white';
-        const titleColor = isOverdue ? 'text-red-700' : 'text-gray-800';
+        // Carian juga di dalam senarai aset
+        const assetMatch = loan.data.assets.some(asset => 
+            (asset.name?.toLowerCase() || '').includes(lowerCaseSearchTerm) ||
+            (asset.serialNumber?.toLowerCase() || '').includes(lowerCaseSearchTerm)
+        );
 
-        const itemHtml = `
-            <div class="border ${borderColor} ${bgColor} rounded-lg shadow-sm p-4">
-                <h3 class="font-semibold ${titleColor}">${data.teacherName}</h3>
-                <p class="text-sm text-gray-600">
-                    Pulang pada: 
-                    <strong class="${isOverdue ? 'text-red-600' : 'text-gray-700'}">${new Date(data.endDate).toLocaleDateString('ms-MY', { day: '2-digit', month: 'short', year: 'numeric' })}</strong>
-                </p>
-                ${isOverdue ? '<p class="text-xs font-semibold text-red-600 mt-1">TELAH TAMAT TEMPOH</p>' : ''}
-                
-                <hr class="my-2">
-                
-                <p class="text-xs text-gray-500 mb-1">Aset Dipinjam:</p>
-                <ul class="list-disc list-inside space-y-1">
-                    ${data.assets.map(asset => `
-                        <li class="text-sm text-gray-700">${asset.name}</li>
+        return name.includes(lowerCaseSearchTerm) || 
+               ic.includes(lowerCaseSearchTerm) ||
+               assetMatch;
+    });
+
+    if (filteredLoans.length > 0) {
+        // Isih (sort) pinjaman yang paling baru di atas
+        filteredLoans.sort((a, b) => b.data.approvedAt?.toMillis() - a.data.approvedAt?.toMillis());
+        
+        filteredLoans.forEach(loan => {
+            const loanHtml = renderLoanItem(loan.data);
+            borrowedAssetList.innerHTML += loanHtml;
+        });
+    } else {
+        if (activeLoans.length === 0) {
+            borrowedAssetList.innerHTML = '<p class="text-gray-500 italic">Tiada aset yang sedang dipinjam pada masa ini.</p>';
+        } else {
+            borrowedAssetList.innerHTML = '<p class="text-gray-500 italic">Tiada rekod pinjaman sepadan dengan carian anda.</p>';
+        }
+    }
+}
+
+// Fungsi untuk menjana HTML bagi satu item pinjaman
+function renderLoanItem(loanData) {
+    // Format tarikh
+    const loanDate = loanData.loanDate ? new Date(loanData.loanDate).toLocaleDateString('ms-MY') : 'N/A';
+    const returnDate = loanData.returnDate ? new Date(loanData.returnDate).toLocaleDateString('ms-MY') : 'N/A';
+    
+    // Semak jika tarikh pulang telah lepas
+    const isOverdue = new Date(loanData.returnDate) < new Date() && !loanData.returnedAt;
+    
+    return `
+        <div class="p-4 bg-white border ${isOverdue ? 'border-red-300 bg-red-50' : 'border-gray-200'} rounded-lg shadow-sm space-y-2">
+            <div>
+                <div class="flex justify-between items-center">
+                    <h4 class="text-lg font-semibold text-gray-800">${loanData.applicantName}</h4>
+                    ${isOverdue ? '<span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-red-200 text-red-800">LEWAT PULANG</span>' : ''}
+                </div>
+                <p class="text-sm text-gray-500">No. K/P: ${loanData.applicantIC}</p>
+            </div>
+            
+            <p class="text-sm text-gray-600"><span class="font-medium">Tujuan:</span> ${loanData.purpose}</p>
+            <p class="text-sm text-gray-600"><span class="font-medium">Tarikh Pinjam:</span> ${loanDate}</p>
+            <p class="text-sm ${isOverdue ? 'text-red-600 font-bold' : 'text-gray-600'}"><span class="font-medium">Tarikh Pulang:</span> ${returnDate}</p>
+
+            <!-- Senarai Aset -->
+            <div class="pt-2">
+                <h5 class="text-sm font-semibold text-gray-700 mb-1">Aset Dipinjam:</h5>
+                <ul class="list-disc list-inside space-y-1 pl-2">
+                    ${loanData.assets.map(asset => `
+                        <li class="text-sm text-gray-600">
+                            ${asset.name} <span class="text-gray-400">(${asset.serialNumber || 'N/A'})</span>
+                        </li>
                     `).join('')}
                 </ul>
             </div>
-        `;
-        borrowedListContainer.innerHTML += itemHtml;
-    });
+        </div>
+    `;
 }
 

@@ -1,85 +1,241 @@
-// Tunggu sehingga semua kandungan HTML dimuatkan
+// Tunggu sehingga semua kandungan HTML dan skrip Firebase dimuatkan
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- STATE PENGURUSAN ---
-    // Ini adalah "state" aplikasi kita. Ia mengawal siapa yang log masuk
-    // dan tab mana yang sedang aktif.
-    const state = {
-        isLoggedIn: false, // false = Paparan Guru, true = Paparan Admin
-        currentTab: 'permohonan' // Tab lalai semasa dimuatkan
+    // --- PEMBOLEHUBAH GLOBAL FIREBASE ---
+    let db, auth;
+    
+    // Gunakan pembolehubah global yang disediakan oleh persekitaran
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'sistem-pinjaman-aset-ict-v2';
+    
+    // Pembolehubah untuk menyimpan pendengar (listeners) Firestore
+    let assetsListener = null;
+    let loansListener = null;
+
+    // --- STATE PENGURUSAN GLOBAL ---
+    // Ini menggantikan 'mockData'. Semua data dari Firestore akan disimpan di sini.
+    const globalState = {
+        assets: [],       // Senarai semua aset dari Firestore
+        loans: [],        // Senarai semua pinjaman dari Firestore
+        currentUser: null, // Objek pengguna Firebase
+        isAdmin: false,   // Ditentukan selepas log masuk
+        currentTab: 'permohonan', // Tab semasa
+        selectedAssets: new Map() // Untuk menyimpan aset yang dipilih dalam borang
     };
 
     // --- ELEMEN DOM ---
-    // Dapatkan elemen utama dari HTML untuk kita manipulasi
     const authSection = document.getElementById('auth-section');
     const navTabs = document.getElementById('nav-tabs');
     const contentArea = document.getElementById('content-area');
 
-    // --- DATA MOCK (DATA CONTOH) ---
-    // Data ini menggantikan pangkalan data sebenar untuk tujuan demonstrasi
-    const mockData = {
-        assets: {
-            laptop: [
-                "LAPTOP JOI CHROMEBOOK 1", "LAPTOP JOI CHROMEBOOK 2", "LAPTOP JOI CHROMEBOOK 3",
-                "LAPTOP JOI CHROMEBOOK 4", "LAPTOP JOI CHROMEBOOK 5", "LAPTOP JOI CLASSROOM 1",
-                "LAPTOP JOI CLASSROOM 2", "LAPTOP JOI CLASSROOM 3", "LAPTOP JOI CLASSROOM 4",
-                "LAPTOP JOI CLASSROOM 5", "Lenovo Guru 2", "Lenovo Guru 3", "Lenovo Guru 4"
-            ],
-            tablet: ["Tablet 1", "Tablet 2", "Tablet 3"], // Data contoh
-            projector: ["Projector 1"], // Data contoh
-            lain: ["Lain-lain 1"] // Data contoh
-        },
-        loaned: [
-            { id: 1, name: "LENOVO MAKER LAB 1", borrower: "MUHAMMAD IHSAN BIN SHAIK ALI", return: "2 Nov 2025", approved: "gurubesar@sksa.com", daysLeft: 2 },
-            { id: 2, name: "LAPTOP BUDIMAS 5", borrower: "Soleha", return: "12 Dis 2025", approved: "gurubesar@sksa.com", daysLeft: 42 },
-            { id: 3, name: "Lenovo Guru 1", borrower: "SHARIMAH BT MD ZIN", return: "19 Dis 2025", approved: "guruict@sksa.com", daysLeft: 49 },
-            { id: 4, name: "Tablet LENOVO 1", borrower: "NUR IZZATI BINTI MOHD KHALIL", return: "19 Dis 2025", approved: "guruict@sksa.com", daysLeft: 49 },
-            { id: 5, name: "Tablet LENOVO 12", borrower: "NUR IZZATI BINTI MOHD KHALIL", return: "19 Dis 2025", approved: "guruict@sksa.com", daysLeft: 49 },
-            { id: 6, name: "TV 32 INCH 1", borrower: "NUR RAIHAN BINTI AHMAD FIRDAUS", return: "19 Dis 2025", approved: "guruict@sksa.com", daysLeft: 49 },
-        ],
-        records: [
-            { id: 1, teacher: "MUHAMMAD IHSAN BIN SHAIK ALI", ic: "910310075175", asset: "LENOVO MAKER LAB 1", start: "29 Okt 2025", end: "2 Nov 2025" },
-            { id: 2, teacher: "Soleha", ic: "910921075377", asset: "LAPTOP BUDIMAS 5", start: "29 Okt 2025", end: "12 Dis 2025" },
-            { id: 3, teacher: "NUR RAIHAN BINTI AHMAD FIRDAUS", ic: "910112075166", asset: "TV 32 INCH 1", start: "29 Okt 2025", end: "19 Dis 2025" },
-            { id: 4, teacher: "SANGARA NANDA A/L KARRUPPIAH", ic: "710424075521", asset: "1. LAPTOP BUDIMAS 2\n2. ...", start: "28 Okt 2025", end: "30 Nov 2025" },
-        ]
-    };
+    // --- INISIALISASI FIREBASE ---
+    // Pastikan kod Firebase telah dimuatkan dari index.html
+    if (window.firebase) {
+        // Ambil fungsi dari 'window.firebase'
+        const {
+            initializeApp, getAuth, onAuthStateChanged, signInAnonymously,
+            signInWithCustomToken, getFirestore, setLogLevel, doc, getDoc
+        } = window.firebase;
+
+        try {
+            // 1. Dapatkan Konfigurasi Firebase
+            // __firebase_config disediakan secara global dalam persekitaran
+            const firebaseConfig = JSON.parse(__firebase_config);
+            
+            // 2. Inisialisasi Aplikasi Firebase
+            const app = initializeApp(firebaseConfig);
+            
+            // 3. Dapatkan Servis Firestore dan Auth
+            db = getFirestore(app);
+            auth = getAuth(app);
+
+            // 4. Set Log Level (untuk debugging)
+            setLogLevel('Debug');
+
+            // 5. Setup Pendengar Status Pengesahan (Auth)
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    // Pengguna telah log masuk
+                    globalState.currentUser = user;
+                    await checkAdminStatus(user.uid); // Semak jika pengguna adalah admin
+                } else {
+                    // Tiada pengguna log masuk, cuba log masuk
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined') {
+                            // Log masuk menggunakan token khas jika ada
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            // Jika tiada token, log masuk sebagai pengguna tanpa nama (guru)
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                        console.error("Ralat semasa log masuk:", error);
+                        contentArea.innerHTML = "<p class='text-red-500'>Gagal mengesahkan pengguna.</p>";
+                    }
+                }
+                // 'onAuthStateChanged' akan dipanggil sekali lagi selepas log masuk berjaya,
+                // di mana 'if (user)' akan dijalankan.
+            });
+
+        } catch (error) {
+            console.error("Ralat Inisialisasi Firebase:", error);
+            contentArea.innerHTML = "<p class='text-red-500'>Ralat memuatkan konfigurasi Firebase. Sila pastikan __firebase_config ditetapkan dengan betul.</p>";
+        }
+
+    } else {
+        console.error("Firebase SDK tidak dimuatkan!");
+        contentArea.innerHTML = "<p class='text-red-500'>Fail Firebase SDK gagal dimuatkan. Sila semak index.html.</p>";
+    }
+
+    /**
+     * Semak status admin pengguna dari Firestore
+     * dan setup pendengar (listeners) data
+     */
+    async function checkAdminStatus(uid) {
+        const { doc, getDoc } = window.firebase;
+        // Semak dokumen dalam koleksi khas untuk admin
+        // ANDA MESTI BUAT KOLEKSI INI DI FIREBASE: /artifacts/{appId}/public/data/admins/{uid}
+        try {
+            const adminDocRef = doc(db, `/artifacts/${appId}/public/data/admins`, uid);
+            const adminDoc = await getDoc(adminDocRef);
+            
+            globalState.isAdmin = adminDoc.exists(); // true jika dokumen wujud
+            
+        } catch (error) {
+            console.error("Ralat menyemak status admin:", error);
+            globalState.isAdmin = false; // Anggap bukan admin jika berlaku ralat
+        }
+
+        // Tetapkan tab lalai berdasarkan status
+        globalState.currentTab = globalState.isAdmin ? 'rekodPinjaman' : 'permohonan';
+        
+        // Mulakan pendengar (listeners) data selepas status auth diketahui
+        setupFirestoreListeners();
+        
+        // Render aplikasi
+        renderApp();
+    }
+
+    /**
+     * Setup pendengar 'onSnapshot' untuk data real-time
+     */
+    function setupFirestoreListeners() {
+        const { collection, onSnapshot } = window.firebase;
+        
+        // Pastikan pendengar lama ditutup sebelum memulakan yang baru
+        if (assetsListener) assetsListener();
+        if (loansListener) loansListener();
+
+        // 1. Pendengar untuk koleksi 'assets'
+        const assetsCollection = collection(db, `/artifacts/${appId}/public/data/assets`);
+        assetsListener = onSnapshot(assetsCollection, (snapshot) => {
+            globalState.assets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            console.log("Data Aset dikemaskini:", globalState.assets);
+            renderApp(); // Render semula aplikasi dengan data baru
+        }, (error) => {
+            console.error("Ralat mendengar data aset:", error);
+        });
+
+        // 2. Pendengar untuk koleksi 'loans'
+        const loansCollection = collection(db, `/artifacts/${appId}/public/data/loans`);
+        loansListener = onSnapshot(loansCollection, (snapshot) => {
+            globalState.loans = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            console.log("Data Pinjaman dikemaskini:", globalState.loans);
+            renderApp(); // Render semula aplikasi dengan data baru
+        }, (error) => {
+            console.error("Ralat mendengar data pinjaman:", error);
+        });
+    }
 
     // --- FUNGSI RENDER KANDUNGAN TAB ---
-    // Setiap fungsi ini mengembalikan (return) string HTML untuk kandungan tab tertentu.
+
+    /**
+     * Helper: Kumpulan aset mengikut kategori
+     */
+    function groupAssets(assets) {
+        return assets.reduce((acc, asset) => {
+            const category = asset.category || 'Lain-lain';
+            if (!acc[category]) {
+                acc[category] = [];
+            }
+            acc[category].push(asset);
+            return acc;
+        }, {});
+    }
+
+    /**
+     * Helper: Kira baki hari
+     */
+    function calculateDaysLeft(endDateString) {
+        if (!endDateString) return 'N/A';
+        try {
+            // Anggap 'endDateString' adalah dari <input type="date"> (YYYY-MM-DD) atau ISO string
+            const end = new Date(endDateString);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Set ke permulaan hari
+            end.setHours(0, 0, 0, 0); // Set ke permulaan hari
+            
+            const diffTime = end.getTime() - today.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays < 0) return 'TERLEPAS';
+            if (diffDays === 0) return 'HARI INI';
+            return `${diffDays} HARI LAGI`;
+
+        } catch (e) {
+            console.warn("Format tarikh tidak sah:", endDateString);
+            return 'N/A';
+        }
+    }
+    
+    /**
+     * Helper: Format tarikh
+     */
+    function formatDate(dateString) {
+        if (!dateString) return 'N/A';
+        try {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('ms-MY', { day: '2-digit', month: 'short', year: 'numeric' });
+        } catch(e) {
+            return dateString; // Kembalikan string asal jika format tidak sah
+        }
+    }
+
 
     /**
      * Menjana HTML untuk Tab Permohonan (Paparan Guru)
      */
     function renderPermohonan() {
+        const availableAssets = globalState.assets.filter(a => a.status === 'available');
+        const assetsByCat = groupAssets(availableAssets);
+        
         return `
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <!-- Bahagian 1: Borang Permohonan -->
                 <div class="lg:col-span-2 bg-white p-6 rounded-lg shadow">
                     <h2 class="text-2xl font-bold text-blue-700 mb-6">1. Buat Permohonan Pinjaman</h2>
-                    <form class="space-y-4">
+                    <form class="space-y-4" id="loan-form">
                         <div>
                             <label for="nama_guru" class="block text-sm font-medium text-gray-700">Nama Guru</label>
-                            <input type="text" id="nama_guru" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            <input type="text" id="nama_guru" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" required>
                         </div>
                         <div>
                             <label for="no_kp" class="block text-sm font-medium text-gray-700">No Kad Pengenalan</label>
-                            <input type="text" id="no_kp" placeholder="Cth: 900101-01-1234" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            <input type="text" id="no_kp" placeholder="Cth: 900101-01-1234" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" required>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label for="tarikh_pinjam" class="block text-sm font-medium text-gray-700">Tarikh Pinjam</label>
-                                <input type="text" id="tarikh_pinjam" placeholder="dd/mm/yyyy" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                <input type="date" id="tarikh_pinjam" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" required>
                             </div>
                             <div>
                                 <label for="tarikh_pulang" class="block text-sm font-medium text-gray-700">Tarikh Pulang</label>
-                                <input type="text" id="tarikh_pulang" placeholder="dd/mm/yyyy" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                <input type="date" id="tarikh_pulang" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" required>
                             </div>
                         </div>
                         <div>
                             <label for="tujuan" class="block text-sm font-medium text-gray-700">Tujuan Pinjaman</label>
-                            <textarea id="tujuan" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"></textarea>
-                            <p class="mt-2 text-xs text-gray-500">Sila pilih aset dari senarai di sebelah sebelum menghantar.</p>
+                            <textarea id="tujuan" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" required></textarea>
+                            <p class="mt-2 text-xs text-gray-500">Pilihan aset: ${globalState.selectedAssets.size} item dipilih.</p>
                         </div>
                         <div>
                             <button type="submit" class="w-full justify-center rounded-md border border-transparent bg-green-600 py-3 px-4 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
@@ -91,12 +247,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 <!-- Bahagian 2: Senarai Aset (Accordion) -->
                 <div class="lg:col-span-1 bg-white p-6 rounded-lg shadow">
-                    <h2 class="text-2xl font-bold text-green-700 mb-6">2. Pilih Aset (Pilih item untuk dipinjam)</h2>
+                    <h2 class="text-2xl font-bold text-green-700 mb-6">2. Pilih Aset</h2>
                     <div class="space-y-2" id="accordion-container">
-                        ${renderAccordionItem('Laptop', mockData.assets.laptop, true)}
-                        ${renderAccordionItem('Tablet', mockData.assets.tablet)}
-                        ${renderAccordionItem('Projector', mockData.assets.projector)}
-                        ${renderAccordionItem('Lain-lain', mockData.assets.lain)}
+                        ${renderAccordionItem('Laptop', assetsByCat['Laptop'] || [], true, true)}
+                        ${renderAccordionItem('Tablet', assetsByCat['Tablet'] || [], false, true)}
+                        ${renderAccordionItem('Projector', assetsByCat['Projector'] || [], false, true)}
+                        ${renderAccordionItem('Lain-lain', assetsByCat['Lain-lain'] || [], false, true)}
                     </div>
                 </div>
             </div>
@@ -104,17 +260,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * Menjana HTML untuk Tab Aset Tersedia (Paparan Guru)
+     * Menjana HTML untuk Tab Aset Tersedia (Paparan Guru/Admin)
      */
     function renderAsetTersedia() {
+        const availableAssets = globalState.assets.filter(a => a.status === 'available');
+        const assetsByCat = groupAssets(availableAssets);
+
         return `
             <div class="bg-white p-6 rounded-lg shadow">
                 <h2 class="text-2xl font-bold text-green-700 mb-6">Aset Tersedia (Paparan Sahaja)</h2>
                 <div class="space-y-2" id="accordion-container">
-                    ${renderAccordionItem('Laptop', mockData.assets.laptop, true, false)}
-                    ${renderAccordionItem('Tablet', mockData.assets.tablet, false, false)}
-                    ${renderAccordionItem('Projector', mockData.assets.projector, false, false)}
-                    ${renderAccordionItem('Lain-lain', mockData.assets.lain, false, false)}
+                    ${renderAccordionItem('Laptop', assetsByCat['Laptop'] || [], true, false)}
+                    ${renderAccordionItem('Tablet', assetsByCat['Tablet'] || [], false, false)}
+                    ${renderAccordionItem('Projector', assetsByCat['Projector'] || [], false, false)}
+                    ${renderAccordionItem('Lain-lain', assetsByCat['Lain-lain'] || [], false, false)}
                 </div>
             </div>
         `;
@@ -122,16 +281,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     /**
      * Fungsi bantuan untuk menjana item accordion
-     * @param {string} title - Tajuk accordion (cth: "Laptop")
-     * @param {string[]} items - Senarai item di dalam
-     * @param {boolean} [isOpen=false] - Sama ada patut dibuka secara lalai
-     * @param {boolean} [isClickable=true] - Sama ada item boleh diklik (untuk borang permohonan)
+     * @param {string} title - Tajuk accordion
+     * @param {object[]} items - Senarai OBJEK aset (cth: {id: '123', name: 'Laptop 1'})
+     * @param {boolean} [isOpen=false] - Dibuka secara lalai
+     * @param {boolean} [isClickable=true] - Boleh diklik (untuk borang)
      */
     function renderAccordionItem(title, items, isOpen = false, isClickable = true) {
         const itemCount = items.length;
-        const itemClass = isClickable 
-            ? 'cursor-pointer hover:bg-green-100 border border-green-300' 
-            : 'border border-gray-300';
         
         return `
             <div class="rounded-md border border-gray-200">
@@ -143,11 +299,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     <svg class="accordion-icon w-5 h-5 text-gray-600 ${isOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                 </button>
                 <div class="accordion-content p-4 grid grid-cols-2 sm:grid-cols-3 gap-2 ${isOpen ? '' : 'hidden'}">
-                    ${items.map(item => `
-                        <div class="text-sm text-green-800 bg-green-50 rounded-md p-2 text-center ${itemClass}">
-                            ${item}
-                        </div>
-                    `).join('')}
+                    ${items.map(item => {
+                        const isSelected = globalState.selectedAssets.has(item.id);
+                        const itemClass = isClickable 
+                            ? `asset-item-clickable cursor-pointer hover:bg-green-100 border border-green-300 ${isSelected ? 'selected' : ''}`
+                            : 'border border-gray-300';
+                        
+                        return `
+                            <div class="text-sm text-green-800 bg-green-50 rounded-md p-2 text-center ${itemClass}" 
+                                 data-asset-id="${item.id}" 
+                                 data-asset-name="${item.name}">
+                                ${item.name}
+                            </div>
+                        `;
+                    }).join('')}
                 </div>
             </div>
         `;
@@ -155,22 +320,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     /**
-     * Menjana HTML untuk Tab Aset Dipinjam (Paparan Guru)
+     * Menjana HTML untuk Tab Aset Dipinjam (Paparan Guru/Admin)
      */
     function renderAsetDipinjam() {
+        // Ambil pinjaman yang sedang 'approved' atau 'pending'
+        const loanedItems = globalState.loans.filter(l => l.status === 'approved' || l.status === 'pending');
+
         return `
-            <h2 class="text-2xl font-bold text-red-700 mb-6">Aset Sedang Dipinjam</h2>
+            <h2 class="text-2xl font-bold text-red-700 mb-6">Aset Sedang Dipinjam & Dalam Proses</h2>
+            ${loanedItems.length === 0 ? '<p class="text-gray-600">Tiada aset sedang dipinjam.</p>' : ''}
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                ${mockData.loaned.map(item => `
-                    <div class="bg-white border-2 border-red-200 rounded-lg shadow-sm overflow-hidden flex flex-col">
+                ${loanedItems.map(item => `
+                    <div class="bg-white border-2 ${item.status === 'pending' ? 'border-yellow-300' : 'border-red-200'} rounded-lg shadow-sm overflow-hidden flex flex-col">
                         <div class="p-5 flex-grow">
-                            <h3 class="text-lg font-bold text-red-800">${item.name}</h3>
-                            <p class="text-sm text-gray-600 mt-2">Pemimjam: ${item.borrower}</p>
-                            <p class="text-sm text-gray-600">Pulang: ${item.return}</p>
-                            <p class="text-xs text-gray-500 mt-1">Lulus oleh: ${item.approved}</p>
+                            <div class="flex justify-between items-center">
+                                <h3 class="text-lg font-bold text-red-800">${item.assetName}</h3>
+                                <span class="text-xs font-bold px-2 py-1 rounded-full ${item.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}">
+                                    ${item.status === 'pending' ? 'MENUNGGU LULUS' : 'DIPINJAM'}
+                                </span>
+                            </div>
+                            <p class="text-sm text-gray-600 mt-2">Pemimjam: ${item.teacherName}</p>
+                            <p class="text-sm text-gray-600">Pulang: ${formatDate(item.endDate)}</p>
+                            <p class="text-xs text-gray-500 mt-1">Lulus oleh: ${item.approvedBy || 'N/A'}</p>
                         </div>
-                        <div class="bg-red-50 p-5 border-t border-red-200">
-                            <p class="text-3xl font-bold text-blue-700 text-center">${item.daysLeft} HARI LAGI</p>
+                        <div class="${item.status === 'pending' ? 'bg-yellow-50' : 'bg-red-50'} p-5 border-t ${item.status === 'pending' ? 'border-yellow-300' : 'border-red-200'}">
+                            <p class="text-3xl font-bold text-blue-700 text-center">
+                                ${item.status === 'pending' ? 'MENUNGGU' : calculateDaysLeft(item.endDate)}
+                            </p>
                         </div>
                     </div>
                 `).join('')}
@@ -186,56 +362,79 @@ document.addEventListener('DOMContentLoaded', () => {
             <!-- Bahagian Tambah Aset Pukal -->
             <div class="mb-6 bg-white rounded-lg shadow border border-gray-200">
                 <button class="accordion-toggle flex w-full justify-between items-center p-5">
-                    <h2 class="text-xl font-bold text-gray-800">Tambah Aset Pukal (Admin)</h2>
+                    <h2 class="text-xl font-bold text-gray-800">Tambah Aset Baru (Admin)</h2>
                     <svg class="accordion-icon w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                 </button>
                 <div class="accordion-content p-5 border-t border-gray-200 hidden">
-                    <p>Borang untuk tambah aset akan berada di sini.</p>
-                    <!-- Di sini anda boleh letak borang untuk muat naik fail CSV atau tambah aset secara manual -->
+                    <form id="add-asset-form" class="space-y-4">
+                        <div>
+                            <label for="asset-name" class="block text-sm font-medium text-gray-700">Nama Aset</label>
+                            <input type="text" id="asset-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                        </div>
+                        <div>
+                            <label for="asset-category" class="block text-sm font-medium text-gray-700">Kategori</label>
+                            <select id="asset-category" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                                <option value="Laptop">Laptop</option>
+                                <option value="Tablet">Tablet</option>
+                                <option value="Projector">Projector</option>
+                                <option value="Lain-lain">Lain-lain</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700">
+                            Tambah Aset
+                        </button>
+                    </form>
                 </div>
             </div>
 
             <!-- Bahagian Rekod Permohonan -->
             <div class="bg-white rounded-lg shadow overflow-hidden">
-                <div class="flex justify-between items-center p-5">
-                    <h2 class="text-xl font-bold text-indigo-700">Rekod Permohonan dan Pinjaman</h2>
-                    <button class="px-4 py-2 bg-gray-700 text-white text-sm font-medium rounded-md hover:bg-gray-800">
-                        Kosongkan Rekod Lama (Selesai/Ditolak)
-                    </button>
-                </div>
+                <h2 class="text-xl font-bold text-indigo-700 p-5">Rekod Permohonan dan Pinjaman</h2>
                 
                 <!-- Jadual Rekod -->
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tindakan</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Guru</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No. K/P</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aset Dipohon</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tarikh Pinjam</th>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tarikh Pulang</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tindakan</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama Guru</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Aset Dipohon</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tarikh Pinjam</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tarikh Pulang</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                            ${mockData.records.map(rec => `
+                            ${globalState.loans.length === 0 ? '<tr><td colspan="6" class="p-6 text-center text-gray-500">Tiada rekod pinjaman ditemui.</td></tr>' : ''}
+                            ${globalState.loans.map(rec => `
                                 <tr>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                         <div class="flex items-center space-x-3">
-                                            <a href="#" class="text-blue-600 hover:text-blue-900">Pulang</a>
-                                            <a href="#" class="text-gray-400 hover:text-gray-600">
-                                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"></path></svg>
-                                            </a>
-                                            <a href="#" class="text-red-400 hover:text-red-600">
-                                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
-                                            </a>
+                                            ${rec.status === 'pending' ? `
+                                                <button class="btn-approve text-green-600 hover:text-green-900" data-id="${rec.id}" data-asset-id="${rec.assetId}">Lulus</button>
+                                                <button class="btn-reject text-red-600 hover:text-red-900" data-id="${rec.id}" data-asset-id="${rec.assetId}">Tolak</button>
+                                            ` : ''}
+                                            ${rec.status === 'approved' ? `
+                                                <button class="btn-return text-blue-600 hover:text-blue-900" data-id="${rec.id}" data-asset-id="${rec.assetId}">Pulang</button>
+                                            ` : ''}
+                                            ${rec.status === 'returned' || rec.status === 'rejected' ? `
+                                                <button class="btn-delete text-gray-400 hover:text-gray-600" data-id="${rec.id}">Padam</button>
+                                            ` : ''}
                                         </div>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${rec.teacher}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${rec.ic}</td>
-                                    <td class="px-6 py-4 text-sm text-gray-500" style="white-space: pre-wrap;">${rec.asset}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${rec.start}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${rec.end}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                            rec.status === 'approved' ? 'bg-red-100 text-red-800' :
+                                            rec.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                            rec.status === 'returned' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                                        }">
+                                            ${rec.status || 'N/A'}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${rec.teacherName}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${rec.assetName}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatDate(rec.startDate)}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatDate(rec.endDate)}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -246,9 +445,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- FUNGSI RENDER UTAMA ---
-    // Fungsi ini dipanggil setiap kali state berubah (cth: tukar tab, log masuk/keluar)
     
     function renderApp() {
+        if (!globalState.currentUser) return; // Jangan render jika pengguna belum disahkan
+
         // 1. Render Bahagian Pengesahan (Header)
         renderAuthSection();
         
@@ -258,34 +458,25 @@ document.addEventListener('DOMContentLoaded', () => {
         // 3. Render Kandungan Tab Aktif
         renderContentArea();
 
-        // 4. Tambah Event Listeners untuk elemen yang baru di-render (cth: accordion)
+        // 4. Tambah Event Listeners
         addDynamicEventListeners();
     }
 
     /**
-     * Kemaskini bahagian header (info guru/admin & butang log masuk/keluar)
+     * Kemaskini bahagian header (info guru/admin)
      */
     function renderAuthSection() {
-        if (state.isLoggedIn) {
-            // Paparan Admin
+        const user = globalState.currentUser;
+        if (globalState.isAdmin) {
             authSection.innerHTML = `
-                <span class="text-sm text-gray-600">Admin: <span class="font-medium">gurubesar@sksa.com</span></span>
-                <button id="auth-button" class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700">
-                    Log Keluar
-                </button>
+                <span class="text-sm text-gray-600">Admin: <span class="font-medium">${user.email || user.uid}</span></span>
+                <!-- Butang Log Keluar tidak ditambah kerana auth dikawal oleh token persekitaran -->
             `;
         } else {
-            // Paparan Guru
             authSection.innerHTML = `
-                <span class="text-sm text-gray-600">Mod Guru (ID: <span class="font-medium">xSNPYF</span>)</span>
-                <button id="auth-button" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">
-                    Log Masuk Admin
-                </button>
+                <span class="text-sm text-gray-600">Mod Guru (ID: <span class="font-medium">${user.uid.substring(0, 6)}</span>)</span>
             `;
         }
-        
-        // Tambah event listener pada butang yang baru dicipta
-        document.getElementById('auth-button').addEventListener('click', handleAuthToggle);
     }
 
     /**
@@ -293,12 +484,12 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function renderNavTabs() {
         let tabs = [];
-        if (state.isLoggedIn) {
+        if (globalState.isAdmin) {
             // Tab Admin
             tabs = [
+                { id: 'rekodPinjaman', label: 'Rekod Pinjaman' },
                 { id: 'asetTersedia', label: 'Aset Tersedia' },
                 { id: 'asetDipinjam', label: 'Aset Dipinjam' },
-                { id: 'rekodPinjaman', label: 'Rekod Pinjaman' },
             ];
         } else {
             // Tab Guru
@@ -310,7 +501,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         navTabs.innerHTML = tabs.map(tab => `
-            <button class="tab-link py-4 px-1 mx-4 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:border-gray-300 hover:text-gray-700 ${state.currentTab === tab.id ? 'active' : ''}" data-tab-id="${tab.id}">
+            <button class="tab-link py-4 px-1 mx-4 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:border-gray-300 hover:text-gray-700 ${globalState.currentTab === tab.id ? 'active' : ''}" data-tab-id="${tab.id}">
                 ${tab.label}
             </button>
         `).join('');
@@ -325,7 +516,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * Memuatkan kandungan tab yang betul ke dalam contentArea
      */
     function renderContentArea() {
-        switch (state.currentTab) {
+        switch (globalState.currentTab) {
             case 'permohonan':
                 contentArea.innerHTML = renderPermohonan();
                 break;
@@ -336,7 +527,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 contentArea.innerHTML = renderAsetDipinjam();
                 break;
             case 'rekodPinjaman':
-                contentArea.innerHTML = renderRekodPinjaman();
+                // Hanya admin boleh lihat tab ini
+                contentArea.innerHTML = globalState.isAdmin ? renderRekodPinjaman() : '<p>Anda tiada kebenaran untuk melihat halaman ini.</p>';
                 break;
             default:
                 contentArea.innerHTML = `<p>Tab tidak dijumpai.</p>`;
@@ -344,52 +536,223 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     /**
-     * Tambah event listener untuk elemen dinamik seperti accordion
+     * Tambah event listener untuk elemen dinamik
      */
     function addDynamicEventListeners() {
-        const accordions = document.querySelectorAll('.accordion-toggle');
-        accordions.forEach(button => {
+        // 1. Accordion Toggles
+        document.querySelectorAll('.accordion-toggle').forEach(button => {
             button.addEventListener('click', () => {
                 const content = button.nextElementSibling;
                 const icon = button.querySelector('.accordion-icon');
-                
                 content.classList.toggle('hidden');
                 icon.classList.toggle('rotate-180');
             });
         });
+
+        // 2. Pemilihan Aset (dalam borang permohonan)
+        document.querySelectorAll('.asset-item-clickable').forEach(item => {
+            item.addEventListener('click', handleAssetSelect);
+        });
+
+        // 3. Borang Hantar Pinjaman
+        document.getElementById('loan-form')?.addEventListener('submit', handleLoanSubmit);
+        
+        // 4. Borang Tambah Aset (Admin)
+        document.getElementById('add-asset-form')?.addEventListener('submit', handleAssetSubmit);
+        
+        // 5. Butang Tindakan Jadual Admin
+        document.querySelectorAll('.btn-approve').forEach(b => b.addEventListener('click', handleApproveLoan));
+        document.querySelectorAll('.btn-reject').forEach(b => b.addEventListener('click', handleRejectLoan));
+        document.querySelectorAll('.btn-return').forEach(b => b.addEventListener('click', handleReturnLoan));
+        document.querySelectorAll('.btn-delete').forEach(b => b.addEventListener('click', handleDeleteLoan));
     }
 
 
     // --- PENGENDALI ACARA (EVENT HANDLERS) ---
 
     /**
-     * Mengendalikan klik pada butang Log Masuk / Log Keluar
-     */
-    function handleAuthToggle() {
-        state.isLoggedIn = !state.isLoggedIn;
-        
-        // Tetapkan tab lalai baru selepas log masuk/keluar
-        state.currentTab = state.isLoggedIn ? 'rekodPinjaman' : 'permohonan';
-        
-        // Render semula keseluruhan aplikasi
-        renderApp();
-    }
-
-    /**
      * Mengendalikan klik pada tab navigasi
      */
     function handleTabClick(event) {
-        const tabId = event.target.dataset.tabId;
-        state.currentTab = tabId;
-        
-        // Hanya perlu render semula tab dan kandungan, bukan header
-        renderNavTabs(); // Untuk kemaskini kelas 'active'
-        renderContentArea();
-        addDynamicEventListeners(); // Tambah semula listener untuk kandungan baru
+        globalState.currentTab = event.target.dataset.tabId;
+        renderApp(); // Render semula semua
     }
 
-    // --- MULAKAN APLIKASI ---
-    // Panggil renderApp() sekali semasa mula untuk memaparkan paparan lalai
-    renderApp();
+    /**
+     * Mengendalikan pemilihan aset pada borang
+     */
+    function handleAssetSelect(event) {
+        const assetId = event.target.dataset.assetId;
+        const assetName = event.target.dataset.assetName;
+        
+        if (globalState.selectedAssets.has(assetId)) {
+            globalState.selectedAssets.delete(assetId);
+        } else {
+            globalState.selectedAssets.set(assetId, assetName);
+        }
+        
+        // Render semula kandungan untuk kemaskini borang
+        renderContentArea();
+        addDynamicEventListeners();
+    }
+
+    /**
+     * Mengendalikan HANTAR BORANG PINJAMAN
+     */
+    async function handleLoanSubmit(event) {
+        event.preventDefault();
+        const { collection, addDoc, doc, writeBatch } = window.firebase;
+        
+        if (globalState.selectedAssets.size === 0) {
+            alert("Sila pilih sekurang-kurangnya satu aset.");
+            return;
+        }
+
+        const formData = {
+            teacherName: document.getElementById('nama_guru').value,
+            ic: document.getElementById('no_kp').value,
+            startDate: document.getElementById('tarikh_pinjam').value,
+            endDate: document.getElementById('tarikh_pulang').value,
+            purpose: document.getElementById('tujuan').value,
+            status: 'pending', // Status awal
+            requestedAt: new Date().toISOString(),
+            requestedBy: globalState.currentUser.uid
+        };
+
+        // Gunakan 'batch' untuk kemaskini semua aset dan cipta pinjaman
+        const batch = writeBatch(db);
+        const loansCollection = collection(db, `/artifacts/${appId}/public/data/loans`);
+
+        for (const [assetId, assetName] of globalState.selectedAssets.entries()) {
+            // 1. Cipta dokumen pinjaman baru
+            batch.set(doc(loansCollection), {
+                ...formData,
+                assetId: assetId,
+                assetName: assetName
+            });
+            
+            // 2. Kemaskini status aset kepada 'pending'
+            const assetRef = doc(db, `/artifacts/${appId}/public/data/assets`, assetId);
+            batch.update(assetRef, { status: 'pending' });
+        }
+        
+        try {
+            await batch.commit();
+            alert("Permohonan berjaya dihantar!");
+            globalState.selectedAssets.clear();
+            event.target.reset(); // Reset borang
+            // renderApp() akan dipanggil secara automatik oleh onSnapshot
+        } catch (error) {
+            console.error("Ralat menghantar permohonan:", error);
+            alert("Gagal menghantar permohonan. Sila cuba lagi.");
+        }
+    }
+
+    /**
+     * Mengendalikan HANTAR BORANG TAMBAH ASET (Admin)
+     */
+    async function handleAssetSubmit(event) {
+        event.preventDefault();
+        const { collection, addDoc } = window.firebase;
+
+        const assetName = document.getElementById('asset-name').value;
+        const assetCategory = document.getElementById('asset-category').value;
+
+        try {
+            const assetsCollection = collection(db, `/artifacts/${appId}/public/data/assets`);
+            await addDoc(assetsCollection, {
+                name: assetName,
+                category: assetCategory,
+                status: 'available' // Status lalai
+            });
+            
+            alert("Aset berjaya ditambah!");
+            event.target.reset();
+            // renderApp() akan dipanggil oleh onSnapshot
+        } catch (error) {
+            console.error("Ralat menambah aset:", error);
+            alert("Gagal menambah aset.");
+        }
+    }
+    
+    // --- Tindakan Admin ---
+    
+    async function handleApproveLoan(event) {
+        const { doc, updateDoc } = window.firebase;
+        const loanId = event.target.dataset.id;
+        const assetId = event.target.dataset.assetId;
+        
+        const loanRef = doc(db, `/artifacts/${appId}/public/data/loans`, loanId);
+        const assetRef = doc(db, `/artifacts/${appId}/public/data/assets`, assetId);
+
+        try {
+            const batch = window.firebase.writeBatch(db);
+            batch.update(loanRef, { 
+                status: 'approved',
+                approvedBy: globalState.currentUser.email || globalState.currentUser.uid
+            });
+            batch.update(assetRef, { status: 'loaned' });
+            await batch.commit();
+            alert("Pinjaman diluluskan.");
+        } catch (error) {
+            console.error("Ralat meluluskan pinjaman:", error);
+        }
+    }
+    
+    async function handleRejectLoan(event) {
+        const { doc, updateDoc } = window.firebase;
+        const loanId = event.target.dataset.id;
+        const assetId = event.target.dataset.assetId;
+
+        const loanRef = doc(db, `/artifacts/${appId}/public/data/loans`, loanId);
+        const assetRef = doc(db, `/artifacts/${appId}/public/data/assets`, assetId);
+
+        try {
+            const batch = window.firebase.writeBatch(db);
+            batch.update(loanRef, { status: 'rejected' });
+            batch.update(assetRef, { status: 'available' }); // Kembalikan status aset
+            await batch.commit();
+            alert("Pinjaman ditolak.");
+        } catch (error) {
+            console.error("Ralat menolak pinjaman:", error);
+        }
+    }
+    
+    async function handleReturnLoan(event) {
+        const { doc, updateDoc } = window.firebase;
+        const loanId = event.target.dataset.id;
+        const assetId = event.target.dataset.assetId;
+        
+        const loanRef = doc(db, `/artifacts/${appId}/public/data/loans`, loanId);
+        const assetRef = doc(db, `/artifacts/${appId}/public/data/assets`, assetId);
+
+        try {
+            const batch = window.firebase.writeBatch(db);
+            batch.update(loanRef, { status: 'returned' });
+            batch.update(assetRef, { status: 'available' }); // Aset kini tersedia
+            await batch.commit();
+            alert("Aset telah dipulangkan.");
+        } catch (error) {
+            console.error("Ralat memulangkan aset:", error);
+        }
+    }
+    
+    async function handleDeleteLoan(event) {
+        if (!confirm("Adakah anda pasti mahu memadam rekod ini? Tindakan ini tidak boleh diundur.")) {
+            return;
+        }
+        
+        const { doc, deleteDoc } = window.firebase;
+        const loanId = event.target.dataset.id;
+        
+        try {
+            const loanRef = doc(db, `/artifacts/${appId}/public/data/loans`, loanId);
+            await deleteDoc(loanRef);
+            alert("Rekod telah dipadam.");
+        } catch (error) {
+            console.error("Ralat memadam rekod:", error);
+        }
+    }
 
 });
+

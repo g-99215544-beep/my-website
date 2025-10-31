@@ -19,13 +19,19 @@ document.addEventListener('DOMContentLoaded', () => {
         currentUser: null, // Objek pengguna Firebase
         isAdmin: false,   // Ditentukan selepas log masuk
         currentTab: 'permohonan', // Tab semasa
-        selectedAssets: new Map() // Untuk menyimpan aset yang dipilih dalam borang
+        selectedAssets: new Map(), // Untuk menyimpan aset yang dipilih dalam borang
+        assetToDelete: null, // Untuk modal padam
+        assetToEdit: null    // Untuk modal edit
     };
 
     // --- ELEMEN DOM ---
     const authSection = document.getElementById('auth-section');
     const navTabs = document.getElementById('nav-tabs');
     const contentArea = document.getElementById('content-area');
+
+    // --- ELEMEN MODAL ---
+    const deleteModal = document.getElementById('delete-modal');
+    const editModal = document.getElementById('edit-modal');
 
     // --- INISIALISASI FIREBASE ---
     // Pastikan kod Firebase telah dimuatkan dari index.html
@@ -372,34 +378,6 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function renderRekodPinjaman() {
         return `
-            <!-- Bahagian Tambah Aset Pukal -->
-            <div class="mb-6 bg-white rounded-lg shadow border border-gray-200">
-                <button class="accordion-toggle flex w-full justify-between items-center p-5">
-                    <h2 class="text-xl font-bold text-gray-800">Tambah Aset Baru (Admin)</h2>
-                    <svg class="accordion-icon w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                </button>
-                <div class="accordion-content p-5 border-t border-gray-200 hidden">
-                    <form id="add-asset-form" class="space-y-4">
-                        <div>
-                            <label for="asset-name" class="block text-sm font-medium text-gray-700">Nama Aset</label>
-                            <input type="text" id="asset-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
-                        </div>
-                        <div>
-                            <label for="asset-category" class="block text-sm font-medium text-gray-700">Kategori</label>
-                            <select id="asset-category" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
-                                <option value="Laptop">Laptop</option>
-                                <option value="Tablet">Tablet</option>
-                                <option value="Projector">Projector</option>
-                                <option value="Lain-lain">Lain-lain</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700">
-                            Tambah Aset
-                        </button>
-                    </form>
-                </div>
-            </div>
-
             <!-- Bahagian Rekod Permohonan -->
             <div class="bg-white rounded-lg shadow overflow-hidden">
                 <h2 class="text-xl font-bold text-indigo-700 p-5">Rekod Permohonan dan Pinjaman</h2>
@@ -457,6 +435,81 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
+    /**
+     * (BARU) Menjana HTML untuk Tab Pengurusan Aset (Paparan Admin)
+     */
+    function renderPengurusanAset() {
+        return `
+            <!-- Bahagian Tambah Aset Baru -->
+            <div class="mb-6 bg-white rounded-lg shadow border border-gray-200">
+                <button class="accordion-toggle flex w-full justify-between items-center p-5">
+                    <h2 class="text-xl font-bold text-gray-800">Tambah Aset Baru</h2>
+                    <svg class="accordion-icon w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                </button>
+                <div class="accordion-content p-5 border-t border-gray-200 hidden">
+                    <form id="add-asset-form" class="space-y-4">
+                        <div>
+                            <label for="asset-name" class="block text-sm font-medium text-gray-700">Nama Aset</label>
+                            <input type="text" id="asset-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                        </div>
+                        <div>
+                            <label for="asset-category" class="block text-sm font-medium text-gray-700">Kategori</label>
+                            <select id="asset-category" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                                <option value="Laptop">Laptop</option>
+                                <option value="Tablet">Tablet</option>
+                                <option value="Projector">Projector</option>
+                                <option value="Lain-lain">Lain-lain</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700">
+                            Tambah Aset
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Bahagian Senarai Semua Aset -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <h2 class="text-xl font-bold text-indigo-700 p-5">Senarai Semua Aset</h2>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama Aset</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Kategori</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tindakan</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            ${globalState.assets.length === 0 ? '<tr><td colspan="4" class="p-6 text-center text-gray-500">Tiada aset ditemui.</td></tr>' : ''}
+                            ${globalState.assets.map(asset => `
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${asset.name}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${asset.category}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                            asset.status === 'available' ? 'bg-green-100 text-green-800' :
+                                            asset.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                            asset.status === 'loaned' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+                                        }">
+                                            ${asset.status || 'N/A'}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                        <button class="btn-edit-asset text-blue-600 hover:text-blue-900 mr-3" data-id="${asset.id}">Edit</button>
+                                        <button class="btn-delete-asset text-red-600 hover:text-red-900" data-id="${asset.id}" data-status="${asset.status}">Padam</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    }
+
+
     // --- FUNGSI RENDER UTAMA ---
     
     function renderApp() {
@@ -501,6 +554,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Tab Admin
             tabs = [
                 { id: 'rekodPinjaman', label: 'Rekod Pinjaman' },
+                { id: 'pengurusanAset', label: 'Pengurusan Aset' }, // <-- TAB BARU
                 { id: 'asetTersedia', label: 'Aset Tersedia' },
                 { id: 'asetDipinjam', label: 'Aset Dipinjam' },
             ];
@@ -543,6 +597,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Hanya admin boleh lihat tab ini
                 contentArea.innerHTML = globalState.isAdmin ? renderRekodPinjaman() : '<p>Anda tiada kebenaran untuk melihat halaman ini.</p>';
                 break;
+            case 'pengurusanAset': // <-- KES BARU
+                // Hanya admin boleh lihat tab ini
+                contentArea.innerHTML = globalState.isAdmin ? renderPengurusanAset() : '<p>Anda tiada kebenaran untuk melihat halaman ini.</p>';
+                break;
             default:
                 contentArea.innerHTML = `<p>Tab tidak dijumpai.</p>`;
         }
@@ -578,6 +636,16 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.btn-reject').forEach(b => b.addEventListener('click', handleRejectLoan));
         document.querySelectorAll('.btn-return').forEach(b => b.addEventListener('click', handleReturnLoan));
         document.querySelectorAll('.btn-delete').forEach(b => b.addEventListener('click', handleDeleteLoan));
+        
+        // 6. (BARU) Butang Tindakan Pengurusan Aset
+        document.querySelectorAll('.btn-edit-asset').forEach(b => b.addEventListener('click', handleShowEditModal));
+        document.querySelectorAll('.btn-delete-asset').forEach(b => b.addEventListener('click', handleShowDeleteModal));
+
+        // 7. (BARU) Butang Modals
+        document.getElementById('btn-cancel-delete').addEventListener('click', handleCancelDelete);
+        document.getElementById('btn-confirm-delete').addEventListener('click', handleConfirmDelete);
+        document.getElementById('btn-cancel-edit').addEventListener('click', handleCancelEdit);
+        document.getElementById('edit-asset-form').addEventListener('submit', handleUpdateAsset);
     }
 
 
@@ -767,6 +835,116 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-});
+    // --- (BARU) Tindakan Pengurusan Aset ---
 
+    /**
+     * Tunjukkan modal pengesahan padam
+     */
+    function handleShowDeleteModal(event) {
+        const assetId = event.target.dataset.id;
+        const assetStatus = event.target.dataset.status;
+        
+        // Semak jika aset sedang dipinjam
+        if (assetStatus === 'loaned' || assetStatus === 'pending') {
+            const errorDiv = deleteModal.querySelector('#delete-modal-error');
+            errorDiv.textContent = "Aset tidak boleh dipadam kerana ia sedang dipinjam atau dalam proses permohonan.";
+            errorDiv.classList.remove('hidden');
+            deleteModal.querySelector('#btn-confirm-delete').disabled = true;
+        } else {
+            const errorDiv = deleteModal.querySelector('#delete-modal-error');
+            errorDiv.classList.add('hidden');
+            deleteModal.querySelector('#btn-confirm-delete').disabled = false;
+        }
+
+        globalState.assetToDelete = { id: assetId }; // Simpan ID aset
+        deleteModal.style.display = 'flex'; // Tunjukkan modal
+    }
+
+    /**
+     * Batal padam
+     */
+    function handleCancelDelete() {
+        globalState.assetToDelete = null;
+        deleteModal.style.display = 'none'; // Sembunyi modal
+    }
+
+    /**
+     * Sahkan padam (butang merah)
+     */
+    async function handleConfirmDelete() {
+        const { doc, deleteDoc } = window.firebase;
+        const assetId = globalState.assetToDelete.id;
+
+        if (!assetId) return;
+
+        try {
+            const assetRef = doc(db, `/artifacts/${appId}/public/data/assets`, assetId);
+            await deleteDoc(assetRef);
+            handleCancelDelete(); // Tutup modal
+            // onSnapshot akan kemaskini UI secara automatik
+        } catch (error) {
+            console.error("Ralat memadam aset:", error);
+            const errorDiv = deleteModal.querySelector('#delete-modal-error');
+            errorDiv.textContent = "Gagal memadam aset. Sila cuba lagi.";
+            errorDiv.classList.remove('hidden');
+        }
+    }
+
+    /**
+     * Tunjukkan modal edit dan isi data
+     */
+    function handleShowEditModal(event) {
+        const assetId = event.target.dataset.id;
+        const asset = globalState.assets.find(a => a.id === assetId);
+
+        if (!asset) return;
+
+        globalState.assetToEdit = asset; // Simpan objek aset
+
+        // Isi borang modal
+        document.getElementById('edit-asset-name').value = asset.name;
+        document.getElementById('edit-asset-category').value = asset.category;
+        document.getElementById('edit-asset-status').textContent = asset.status;
+        
+        editModal.style.display = 'flex'; // Tunjukkan modal
+    }
+
+    /**
+     * Batal edit
+     */
+    function handleCancelEdit() {
+        globalState.assetToEdit = null;
+        editModal.style.display = 'none'; // Sembunyi modal
+    }
+
+    /**
+     * Hantar borang kemaskini aset
+     */
+    async function handleUpdateAsset(event) {
+        event.preventDefault();
+        const { doc, updateDoc } = window.firebase;
+        const assetId = globalState.assetToEdit.id;
+
+        if (!assetId) return;
+
+        const newName = document.getElementById('edit-asset-name').value;
+        const newCategory = document.getElementById('edit-asset-category').value;
+
+        try {
+            const assetRef = doc(db, `/artifacts/${appId}/public/data/assets`, assetId);
+            await updateDoc(assetRef, {
+                name: newName,
+                category: newCategory
+                // Status tidak diubah di sini
+            });
+            handleCancelEdit(); // Tutup modal
+            // onSnapshot akan kemaskini UI
+        } catch (error) {
+            console.error("Ralat mengemaskini aset:", error);
+            alert("Gagal mengemaskini aset.");
+        }
+    }
+
+
+});
 

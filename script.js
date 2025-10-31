@@ -1,9 +1,3 @@
-const { 
-    initializeApp, 
-    getAuth, signInAnonymously, signInWithCustomToken, signInWithEmailAndPassword, onAuthStateChanged, signOut,
-    getFirestore, doc, getDoc, onSnapshot, collection, query, orderBy
-} = window.firebase;
-
 // Import konfigurasi
 import { firebaseConfig } from './firebaseConfig.js';
 
@@ -60,12 +54,12 @@ async function connectToFirebase() {
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
     
     try {
-        // 1. Inisialisasi Firebase
-        const app = initializeApp(firebaseConfig);
-        auth = getAuth(app);
-        db = getFirestore(app); // <-- 'db' kini wujud
+        // (FIX) Panggil window.firebase secara terus
+        const app = window.firebase.initializeApp(firebaseConfig);
+        auth = window.firebase.getAuth(app);
+        db = window.firebase.getFirestore(app); // <-- 'db' kini wujud
         
-        // 2. (FIX) Panggil init function SELEPAS db wujud
+        // 2. Panggil init function SELEPAS db wujud
         initTabPermohonan(db);
         initTabAset();
         initTabDipinjam();
@@ -94,7 +88,8 @@ function setupAuthListeners(appId) { // Terima appId
     // Dapatkan token auth (disediakan oleh Canvas)
     const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-    onAuthStateChanged(auth, async (user) => {
+    // (FIX) Panggil window.firebase secara terus
+    window.firebase.onAuthStateChanged(auth, async (user) => {
         if (user) {
             // Pengguna log masuk
             currentUserId = user.uid;
@@ -130,9 +125,11 @@ function setupAuthListeners(appId) { // Terima appId
             // Cuba log masuk (Token Khas atau Anonymous)
             try {
                 if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
+                    // (FIX) Panggil window.firebase secara terus
+                    await window.firebase.signInWithCustomToken(auth, initialAuthToken);
                 } else {
-                    await signInAnonymously(auth);
+                    // (FIX) Panggil window.firebase secara terus
+                    await window.firebase.signInAnonymously(auth);
                 }
             } catch (error) {
                 console.error("Ralat Log Masuk Automatik:", error);
@@ -155,13 +152,13 @@ async function handleLogin(e) {
     loginSubmitBtn.textContent = 'Memproses...';
 
     try {
-        // Log keluar pengguna 'anonymous' sedia ada dahulu
+        // (FIX) Panggil window.firebase secara terus
         if (auth.currentUser && auth.currentUser.isAnonymous) {
-            await signOut(auth);
+            await window.firebase.signOut(auth);
         }
         
-        // Log masuk dengan e-mel & kata laluan
-        await signInWithEmailAndPassword(auth, email, password);
+        // (FIX) Panggil window.firebase secara terus
+        await window.firebase.signInWithEmailAndPassword(auth, email, password);
         // onAuthStateChanged akan mengendalikan selebihnya
         playSound('success');
         
@@ -169,8 +166,8 @@ async function handleLogin(e) {
         console.error("Ralat Log Masuk Manual:", error);
         loginError.textContent = 'E-mel atau kata laluan salah.';
         playSound('error');
-        // Log masuk semula sebagai anonymous jika gagal
-        await signInAnonymously(auth);
+        // (FIX) Panggil window.firebase secara terus
+        await window.firebase.signInAnonymously(auth);
         
     } finally {
         loginSubmitBtn.disabled = false;
@@ -183,7 +180,8 @@ async function handleLogout() {
     const confirmed = await showConfirm('Log Keluar', 'Anda pasti mahu log keluar dari mod Admin?');
     if (confirmed) {
         try {
-            await signOut(auth);
+            // (FIX) Panggil window.firebase secara terus
+            await window.firebase.signOut(auth);
             // onAuthStateChanged akan log masuk sebagai anonymous secara automatik
         } catch (error) {
             console.error("Ralat Log Keluar:", error);
@@ -200,11 +198,12 @@ function attachFirestoreListeners(appId, userId) {
     detachFirestoreListeners();
 
     // 1. Pendengar untuk Aset (Koleksi Awam)
-    // (FIX) Gunakan appId untuk laluan (path) yang betul
     const assetsPath = `artifacts/${appId}/public/data/assets`;
-    const assetsQuery = query(collection(db, assetsPath)); 
+    // (FIX) Panggil window.firebase secara terus
+    const assetsQuery = window.firebase.query(window.firebase.collection(db, assetsPath)); 
     
-    assetsListener = onSnapshot(assetsQuery, (snapshot) => {
+    // (FIX) Panggil window.firebase secara terus
+    assetsListener = window.firebase.onSnapshot(assetsQuery, (snapshot) => {
         let assets = snapshot.docs.map(doc => ({ id: doc.id, data: doc.data() }));
         
         // Isih (sort) di sini menggunakan JavaScript
@@ -227,11 +226,12 @@ function attachFirestoreListeners(appId, userId) {
     });
 
     // 2. Pendengar untuk Pinjaman (Koleksi Awam)
-    // (FIX) Gunakan appId untuk laluan (path) yang betul
     const loansPath = `artifacts/${appId}/public/data/loans`;
-    const loansQuery = query(collection(db, loansPath)); // Ambil semua
+    // (FIX) Panggil window.firebase secara terus
+    const loansQuery = window.firebase.query(window.firebase.collection(db, loansPath)); // Ambil semua
     
-    loansListener = onSnapshot(loansQuery, (snapshot) => {
+    // (FIX) Panggil window.firebase secara terus
+    loansListener = window.firebase.onSnapshot(loansQuery, (snapshot) => {
         const loans = snapshot.docs.map(doc => ({ id: doc.id, data: doc.data() }));
         
         // Hantar data pinjaman ke semua tab yang memerlukannya
@@ -258,10 +258,13 @@ function detachFirestoreListeners() {
 
 // Pendengar untuk Maklumat Sekolah (Nama Sekolah)
 function listenSchoolInfo(appId) { // Terima appId
-    // (FIX) Gunakan appId untuk laluan (path) yang betul
     const schoolInfoPath = `artifacts/${appId}/public/data/school_info/details`;
     
-    schoolInfoListener = onSnapshot(doc(db, schoolInfoPath), (doc) => {
+    // (FIX) Panggil window.firebase secara terus
+    const schoolInfoRef = window.firebase.doc(db, schoolInfoPath);
+    
+    // (FIX) Panggil window.firebase secara terus
+    schoolInfoListener = window.firebase.onSnapshot(schoolInfoRef, (doc) => {
         if (doc.exists()) {
             const schoolName = doc.data().name;
             if (schoolName) {
@@ -311,5 +314,4 @@ function handleTabClick(e) {
         activePanel.classList.add('active');
     }
 }
-
 

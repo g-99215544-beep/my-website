@@ -1,7 +1,4 @@
-// Import fungsi utama dari Firebase (melalui tetingkap global)
-const { 
-    doc, getDoc, collection, addDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, writeBatch
-} = window.firebase;
+// (FIX) Alih keluar import Firebase yang rosak dari bahagian atas fail ini.
 
 // Import modul Utiliti
 import { showMessage, showConfirm, renderAssetSelectItem, playSound } from './utils.js';
@@ -116,22 +113,24 @@ async function handleLoanSubmission(e) {
             purpose,
             assets: selectedAssets, // Simpan sebagai array of objects
             status: 'Pending', // Status awal: Menunggu kelulusan
-            requestedAt: serverTimestamp(),
+            // (FIX) Panggil window.firebase secara terus
+            requestedAt: window.firebase.serverTimestamp(),
             approvedBy: null,
             approvedAt: null,
             returnedAt: null
         };
 
-        // Rujuk koleksi 'loans' di bawah laluan (path) yang betul
-        const loansCollectionRef = collection(db, `artifacts/${appId}/public/data/loans`);
-        const newLoanDoc = await addDoc(loansCollectionRef, loanData);
+        // (FIX) Panggil window.firebase secara terus
+        const loansCollectionRef = window.firebase.collection(db, `artifacts/${appId}/public/data/loans`);
+        const newLoanDoc = await window.firebase.addDoc(loansCollectionRef, loanData);
 
         // 6. Kemas kini status aset yang dipilih kepada 'Pending' (transaksi batch)
-        const batch = writeBatch(db);
+        // (FIX) Panggil window.firebase secara terus
+        const batch = window.firebase.writeBatch(db);
         
         selectedAssets.forEach(asset => {
-            // Rujuk dokumen aset di bawah laluan (path) yang betul
-            const assetRef = doc(db, `artifacts/${appId}/public/data/assets`, asset.id);
+            // (FIX) Panggil window.firebase secara terus
+            const assetRef = window.firebase.doc(db, `artifacts/${appId}/public/data/assets`, asset.id);
             batch.update(assetRef, { 
                 status: 'Pending', // Tandakan sebagai 'Pending' sementara menunggu kelulusan
                 currentLoanId: newLoanDoc.id // Pautkan ke permohonan pinjaman

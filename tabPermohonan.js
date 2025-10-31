@@ -1,273 +1,159 @@
-// === TABPERMOHONAN.JS ===
-// Menguruskan semua logik untuk Tab 1: Permohonan
-
 // Import fungsi utama dari Firebase (melalui tetingkap global)
-const { collection, addDoc, serverTimestamp, getDocs, updateDoc, doc } = window.firebase;
-// Import fungsi bantuan
-import { showMessage, showConfirm, playSound, renderAssetItem } from './utils.js';
+const { 
+    doc, getDoc, collection, addDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, writeBatch
+} = window.firebase;
 
-// Rujukan global dari script.js
-let db;
-let allAssets = []; // Cache tempatan untuk aset
+// Import modul Utiliti
+import { showMessage, showConfirm, renderAssetSelectItem, playSound } from './utils.js';
 
 // Rujukan DOM
 const loanForm = document.getElementById('loan-form');
-const submitButton = document.getElementById('submit-button');
-const submitStatusError = document.getElementById('submit-status-error');
-
-// Kategori Senarai Borang
-const formCategoryLists = {
-    'Laptop': document.getElementById('form-laptop-list'),
-    'Tablet': document.getElementById('form-tablet-list'),
-    'Projector': document.getElementById('form-projector-list'),
-    'Lain': document.getElementById('form-others-list')
+const assetCategoryLists = {
+    'Laptop': document.getElementById('asset-list-Laptop'),
+    'Tablet': document.getElementById('asset-list-Tablet'),
+    'Projector': document.getElementById('asset-list-Projector'),
+    'Lain-lain': document.getElementById('asset-list-Lain-lain')
 };
-const formCategoryCounts = {
-    'Laptop': document.getElementById('form-laptop-count'),
-    'Tablet': document.getElementById('form-tablet-count'),
-    'Projector': document.getElementById('form-projector-count'),
-    'Lain': document.getElementById('form-others-count')
-};
+const loadingIndicators = document.querySelectorAll('.loading-indicator');
 
+let db; // Akan ditetapkan oleh initTabPermohonan
 
-// Fungsi utama untuk memulakan tab ini
+// Fungsi untuk memulakan tab permohonan
 export function initTabPermohonan(database) {
     db = database;
-    loanForm.addEventListener('submit', handleLoanSubmit);
-    
-    // Tambah pendengar acara untuk butang 'info' (toggle-details-btn)
-    // Gunakan 'event delegation' pada panel
-    document.getElementById('panel-permohonan').addEventListener('click', function(event) {
-        const toggleBtn = event.target.closest('.toggle-details-btn');
-        if (toggleBtn) {
-            event.preventDefault(); // Hentikan <label> dari 'check' checkbox
-            const itemDetails = toggleBtn.closest('.asset-item-details');
-            if (itemDetails) {
-                itemDetails.classList.toggle('open');
-            }
-        }
-    });
+    if (loanForm) {
+        loanForm.addEventListener('submit', handleLoanSubmission);
+    } else {
+        console.error("Borang Pinjaman (loan-form) tidak ditemui!");
+    }
 }
 
-// Kemas kini senarai aset apabila cache global berubah
+// Fungsi untuk mengemas kini senarai aset yang boleh dipilih
 export function updatePermohonanAssets(assets) {
-    allAssets = assets; // Simpan cache aset
-    
-    // 1. Kosongkan semua senarai
-    Object.values(formCategoryLists).forEach(list => list.innerHTML = '');
-    
-    // 2. Kumpulkan aset yang tersedia
-    const availableAssets = assets.filter(asset => asset.data.status === 'Tersedia');
-    
-    // 3. Isih aset (kumpulan dahulu, kemudian mengikut nama)
-    availableAssets.sort((a, b) => {
-        const groupA = a.data.groupName || '';
-        const groupB = b.data.groupName || '';
-        const nameA = a.data.name.toLowerCase();
-        const nameB = b.data.name.toLowerCase();
+    // 1. Kosongkan semua senarai dan penunjuk 'memuatkan'
+    Object.values(assetCategoryLists).forEach(list => list.innerHTML = '');
+    loadingIndicators.forEach(indicator => indicator.classList.add('hidden'));
 
-        // Utamakan item berkumpulan
-        if (groupA && !groupB) return -1;
-        if (!groupA && groupB) return 1;
-        if (groupA && groupB) {
-            if (groupA < groupB) return -1;
-            if (groupA > groupB) return 1;
-        }
-        
-        // Jika kumpulan sama (atau tiada), isih mengikut nama
-        if (nameA < nameB) return -1;
-        if (nameA > nameB) return 1;
-        return 0;
-    });
+    // 2. Tapis aset yang 'Tersedia' (Available) sahaja
+    const availableAssets = assets.filter(asset => asset.data.status === 'Available');
 
-    // 4. Kira jumlah untuk setiap kategori
-    const counts = { 'Laptop': 0, 'Tablet': 0, 'Projector': 0, 'Lain': 0 };
-    
-    // 5. Jana HTML dan tambah ke senarai yang betul
+    // 3. Isih aset ke dalam kategori
     availableAssets.forEach(asset => {
-        const category = asset.data.category || 'Lain';
-        const listContainer = formCategoryLists[category];
-        
-        if (listContainer) {
-            const itemHtml = renderAssetItem(asset, 'form', availableAssets);
-            
-            // Hanya tambah jika HTML dijana (untuk mengelakkan 'child' berkumpulan)
-            if (itemHtml) {
-                listContainer.innerHTML += itemHtml;
-                
-                // Kiraan
-                if (asset.data.groupName && !asset.data.isGroupChild) {
-                    // Ini adalah kad kumpulan, kira semua item tersedia di dalamnya
-                    const groupCount = availableAssets.filter(a => a.data.groupName === asset.data.groupName).length;
-                    counts[category] += groupCount;
-                } else if (!asset.data.groupName) {
-                    // Ini adalah item individu
-                    counts[category]++;
-                }
-            }
+        const category = asset.data.category || 'Lain-lain';
+        if (assetCategoryLists[category]) {
+            const assetHtml = renderAssetSelectItem(asset);
+            assetCategoryLists[category].innerHTML += assetHtml;
         }
     });
 
-    // 6. Kemas kini kiraan dan tunjukkan 'badge'
-    Object.keys(counts).forEach(category => {
-        const count = counts[category];
-        const countEl = formCategoryCounts[category];
-        if (count > 0) {
-            countEl.textContent = count;
-            countEl.classList.remove('hidden');
-        } else {
-            countEl.classList.add('hidden');
-        }
-    });
-
-    // 7. Tunjukkan mesej jika tiada aset
-    Object.keys(formCategoryLists).forEach(category => {
-        if (formCategoryLists[category].innerHTML === '') {
-            formCategoryLists[category].innerHTML = '<p class="text-gray-500 text-sm italic">Tiada aset tersedia dalam kategori ini.</p>';
+    // 4. Tunjukkan mesej "Tiada" jika kategori kosong
+    Object.keys(assetCategoryLists).forEach(category => {
+        if (assetCategoryLists[category].innerHTML === '') {
+            assetCategoryLists[category].innerHTML = '<p class="text-sm text-gray-500 italic px-4">Tiada aset tersedia dalam kategori ini.</p>';
         }
     });
 }
 
-// Logik untuk menghantar borang pinjaman
-async function handleLoanSubmit(e) {
+// Fungsi untuk mengendalikan penghantaran borang permohonan
+async function handleLoanSubmission(e) {
     e.preventDefault();
-    submitButton.disabled = true;
-    submitButton.textContent = 'Menghantar...';
-    submitStatusError.textContent = '';
-
-    // 1. Dapatkan data borang
-    const formData = new FormData(loanForm);
-    const teacherName = formData.get('teacherName').trim();
-    const teacherIC = formData.get('teacherIC').trim();
-    const startDate = formData.get('startDate');
-    const endDate = formData.get('endDate');
-    const purpose = formData.get('purpose').trim();
-    const selectedAssetIds = formData.getAll('selectedAssets');
-
-    // 2. Pengesahan (Validation)
-    if (selectedAssetIds.length === 0) {
-        submitStatusError.textContent = 'Ralat: Sila pilih sekurang-kurangnya satu aset.';
-        submitButton.disabled = false;
-        submitButton.textContent = 'Hantar Permohonan';
-        playSound('error');
-        return;
-    }
+    const submitBtn = e.target.querySelector('button[type="submit"]');
     
-    if (new Date(endDate) < new Date(startDate)) {
-        submitStatusError.textContent = 'Ralat: Tarikh pulang tidak boleh lebih awal dari tarikh pinjam.';
-        submitButton.disabled = false;
-        submitButton.textContent = 'Hantar Permohonan';
+    // Ambil ID Aplikasi (disediakan oleh Canvas)
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+    // 1. Kumpul data borang
+    const formData = new FormData(e.target);
+    const applicantName = formData.get('applicantName');
+    const applicantIC = formData.get('applicantIC');
+    const loanDate = formData.get('loanDate');
+    const returnDate = formData.get('returnDate');
+    const purpose = formData.get('purpose');
+
+    // 2. Kumpul item yang dipilih
+    const selectedAssets = [];
+    const checkedBoxes = document.querySelectorAll('.asset-checkbox:checked');
+    
+    if (checkedBoxes.length === 0) {
+        showMessage('Borang Tidak Lengkap', 'Sila pilih sekurang-kurangnya satu aset untuk dipinjam.');
         playSound('error');
         return;
     }
 
-    // 3. Dapatkan butiran aset yang dipilih dari cache
-    const selectedAssetsDetails = allAssets
-        .filter(asset => selectedAssetIds.includes(asset.id))
-        .map(asset => ({
-            id: asset.id,
-            name: asset.data.name,
-            category: asset.data.category,
-            groupName: asset.data.groupName || ''
-        }));
-        
-    // 4. Sahkan sekali lagi jika aset masih tersedia (Perlumbaan Keadaan - Race Condition)
-    try {
-        const assetDocs = await getDocs(collection(db, 'assets'));
-        const serverAssets = {};
-        assetDocs.forEach(doc => {
-            serverAssets[doc.id] = doc.data();
+    checkedBoxes.forEach(box => {
+        selectedAssets.push({
+            id: box.value,
+            name: box.dataset.name,
+            serialNumber: box.dataset.sn
         });
+    });
 
-        const unavailableItems = [];
-        for (const id of selectedAssetIds) {
-            if (!serverAssets[id] || serverAssets[id].status !== 'Tersedia') {
-                unavailableItems.push(serverAssets[id] ? serverAssets[id].name : `ID: ${id} (telah dipadam)`);
-            }
-        }
-
-        if (unavailableItems.length > 0) {
-            await showMessage(
-                'Aset Tidak Lagi Tersedia',
-                `Maaf, item berikut telah dipinjam atau dialih keluar semasa anda mengisi borang:<br>- <strong>${unavailableItems.join('<br>- ')}</strong><br><br>Sila muat semula (refresh) halaman dan cuba lagi.`
-            );
-            submitButton.disabled = false;
-            submitButton.textContent = 'Hantar Permohonan';
-            // (Kita mungkin mahu memuat semula senarai aset di sini secara automatik)
-            return;
-        }
-
-    } catch (error) {
-        console.error("Ralat memeriksa ketersediaan aset: ", error);
-        submitStatusError.textContent = 'Ralat semasa mengesahkan aset. Sila cuba lagi.';
-        submitButton.disabled = false;
-        submitButton.textContent = 'Hantar Permohonan';
+    // 3. Sahkan data
+    if (!applicantName || !applicantIC || !loanDate || !returnDate || !purpose) {
+        showMessage('Borang Tidak Lengkap', 'Sila isi semua maklumat yang diperlukan.');
         playSound('error');
         return;
     }
 
-
-    // 5. Tunjukkan modal pengesahan
-    const confirmationMessage = `
-        Sila sahkan butiran:<br>
-        - <strong>Nama:</strong> ${teacherName}<br>
-        - <strong>Tarikh:</strong> ${startDate} hingga ${endDate}<br>
-        - <strong>Aset:</strong><br>
-          <ul class="list-disc list-inside ml-4 text-sm">
-            ${selectedAssetsDetails.map(item => `<li>${item.name}</li>`).join('')}
-          </ul>
-    `;
-    
-    const isConfirmed = await showConfirm('Sahkan Permohonan', confirmationMessage);
-
-    if (!isConfirmed) {
-        submitButton.disabled = false;
-        submitButton.textContent = 'Hantar Permohonan';
+    // 4. Sahkan tarikh
+    if (new Date(returnDate) < new Date(loanDate)) {
+        showMessage('Ralat Tarikh', 'Tarikh pulang mestilah selepas atau sama dengan tarikh pinjam.');
+        playSound('error');
         return;
     }
+    
+    // Lumpuhkan butang
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Memproses...';
 
-    // 6. Hantar ke Firestore
     try {
-        // (a) Cipta rekod pinjaman (loans)
-        await addDoc(collection(db, 'loans'), {
-            teacherName,
-            teacherIC,
-            startDate,
-            endDate,
+        // 5. Cipta dokumen 'loan' (pinjaman) baharu
+        const loanData = {
+            applicantName,
+            applicantIC,
+            loanDate,
+            returnDate,
             purpose,
-            assets: selectedAssetsDetails, // Simpan butiran aset
-            status: 'Pending', // Status: Pending, Approved, Returned, Rejected
-            requestedAt: serverTimestamp()
+            assets: selectedAssets, // Simpan sebagai array of objects
+            status: 'Pending', // Status awal: Menunggu kelulusan
+            requestedAt: serverTimestamp(),
+            approvedBy: null,
+            approvedAt: null,
+            returnedAt: null
+        };
+
+        // Rujuk koleksi 'loans' di bawah laluan (path) yang betul
+        const loansCollectionRef = collection(db, `artifacts/${appId}/public/data/loans`);
+        const newLoanDoc = await addDoc(loansCollectionRef, loanData);
+
+        // 6. Kemas kini status aset yang dipilih kepada 'Pending' (transaksi batch)
+        const batch = writeBatch(db);
+        
+        selectedAssets.forEach(asset => {
+            // Rujuk dokumen aset di bawah laluan (path) yang betul
+            const assetRef = doc(db, `artifacts/${appId}/public/data/assets`, asset.id);
+            batch.update(assetRef, { 
+                status: 'Pending', // Tandakan sebagai 'Pending' sementara menunggu kelulusan
+                currentLoanId: newLoanDoc.id // Pautkan ke permohonan pinjaman
+            });
         });
 
-        // (b) Kemas kini status aset kepada 'Pending'
-        // (Ini menghalangnya daripada dipilih oleh orang lain)
-        // Kita guna 'writeBatch' jika ada banyak aset
-        // Walaupun dalam sistem ini, 'Pending' pada 'loans' sudah mencukupi.
-        // Mari kita kemas kini status aset kepada 'Dipohon'
-        
-        for (const assetId of selectedAssetIds) {
-             const assetRef = doc(db, 'assets', assetId);
-             await updateDoc(assetRef, {
-                 status: 'Dipohon' // Tukar status kepada 'Dipohon'
-             });
-        }
-        
-        // 7. Berjaya
-        await showMessage(
-            'Permohonan Dihantar',
-            'Permohonan anda telah berjaya dihantar.<br><br>Sila tunggu kelulusan daripada Admin.'
-        );
-        loanForm.reset();
-        playSound('success');
+        await batch.commit(); // Laksanakan kedua-dua kemas kini serentak
 
+        // 7. Berjaya
+        showMessage('Permohonan Dihantar', 'Permohonan anda telah dihantar dan sedang menunggu kelulusan admin.');
+        playSound('success');
+        e.target.reset(); // Reset borang
+        // Senarai aset akan dikemas kini secara automatik oleh onSnapshot
+        
     } catch (error) {
-        console.error("Ralat menghantar permohonan: ", error);
-        submitStatusError.textContent = `Ralat: ${error.message}`;
+        console.error("Ralat menghantar permohonan:", error);
+        showMessage('Ralat', 'Gagal menghantar permohonan. Sila cuba lagi.');
         playSound('error');
     } finally {
-        submitButton.disabled = false;
-        submitButton.textContent = 'Hantar Permohonan';
+        // Aktifkan semula butang
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Hantar Permohonan';
     }
 }
 

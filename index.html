@@ -4,179 +4,73 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistem Pinjaman Aset ICT</title>
-    <!-- Muat naik Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Fon Inter sebagai fon utama */
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        /* Pastikan @import ada jika Inter tidak dimuatkan secara automatik */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        
-        /* Gaya tambahan untuk tab aktif */
-        .tab-link.active {
-            border-bottom-color: #3b82f6; /* blue-500 */
-            color: #3b82f6; /* blue-500 */
-            font-weight: 600;
-        }
-
-        /* Gaya untuk aset yang dipilih dalam borang */
+        /* Gaya untuk borang permohonan */
         .asset-item-clickable.selected {
-            background-color: #dbeafe; /* blue-100 */
-            border-color: #3b82f6; /* blue-500 */
-            font-weight: 600;
-            box-shadow: 0 0 0 2px #3b82f6;
+            background-color: #e0f2fe; /* light-blue-100 */
+            border-color: #0284c7; /* light-blue-600 */
+            font-weight: 500;
         }
-
-        /* --- GAYA MODAL --- */
-        /* Latar belakang gelap */
-        .modal-overlay {
-            display: none; /* Tersembunyi secara lalai */
-            position: fixed;
-            z-index: 50;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0,0,0,0.5); /* Hitam separa lutsinar */
-            justify-content: center;
-            align-items: center;
+        /* Gaya untuk tab aktif */
+        .tab-link.active {
+            border-color: #4f46e5; /* indigo-600 */
+            color: #4f46e5;
         }
-        
-        /* Kotak modal */
-        .modal-box {
-            background-color: #fefefe;
-            margin: auto;
-            padding: 24px;
-            border-radius: 8px;
-            width: 90%;
-            max-width: 500px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        /* (BARU) Sembunyikan modal secara lalai */
+        .modal {
+            display: none;
         }
     </style>
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-100 font-sans">
 
     <!-- Pengepala (Header) -->
-    <header class="bg-white shadow-md">
-        <div class="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
-            <div class="flex justify-between items-center">
-                <!-- Tajuk Sistem -->
+    <header class="bg-white shadow-md sticky top-0 z-10">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo dan Tajuk -->
                 <div>
-                    <h1 class="text-2xl font-bold text-blue-800">Sistem Pinjaman Aset ICT</h1>
-                    <p class="text-sm text-gray-600">SK SRI AMAN</p>
+                    <h1 class="text-xl sm:text-2xl font-bold text-gray-900">Sistem Pinjaman Aset ICT</h1>
+                    <p class="text-xs sm:text-sm text-gray-600">SK SRI AMAN</p>
                 </div>
-                <!-- Status Admin/Guru & Butang Log Masuk/Keluar -->
-                <div class="flex items-center space-x-4" id="auth-section">
+                
+                <!-- (BARU) Bahagian Pengesahan (Auth) -->
+                <div id="auth-section" class="flex items-center space-x-3">
                     <!-- Kandungan ini akan dijana oleh script.js -->
-                    <span class="text-sm text-gray-500">Memuatkan...</span>
                 </div>
             </div>
+            
+            <!-- Navigasi Tab -->
+            <nav id="nav-tabs" class="flex -mb-px">
+                <!-- Tab akan dijana oleh script.js -->
+            </nav>
         </div>
     </header>
 
-    <!-- Navigasi Tab -->
-    <nav class="bg-white shadow-sm sticky top-0 z-10">
-        <div class="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div class="flex border-b border-gray-200" id="nav-tabs">
-                <!-- Tab akan dijana oleh script.js -->
-            </div>
-        </div>
-    </nav>
-
-    <!-- Ruang Kandungan Utama -->
-    <main class="container mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
-        <div id="content-area">
-            <!-- Kandungan tab akan dimuatkan di sini oleh script.js -->
-            <div class="text-center text-gray-600">
-                <p>Memuatkan data dari pangkalan data...</p>
-            </div>
-        </div>
+    <!-- Kawasan Kandungan Utama -->
+    <main id="content-area" class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <!-- Kandungan tab akan dimuatkan di sini oleh script.js -->
     </main>
 
-    <!--
-      MODUL FIREBASE
-      Menambah Firebase SDKs yang diperlukan.
-    -->
-    <script type="module">
-        // Import modul Firebase yang diperlukan
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { 
-            getAuth, 
-            onAuthStateChanged, 
-            signInAnonymously, 
-            signInWithCustomToken,
-            signOut // <-- TAMBAH INI
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { 
-            getFirestore, 
-            setLogLevel, 
-            doc, 
-            getDoc, 
-            addDoc, 
-            setDoc, 
-            updateDoc, 
-            deleteDoc, 
-            onSnapshot, 
-            collection, 
-            query, 
-            writeBatch 
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Letakkan semua fungsi dan pembolehubah Firebase pada 'window'
-        // supaya script.js boleh mengaksesnya.
-        window.firebase = {
-            initializeApp,
-            getAuth,
-            onAuthStateChanged,
-            signInAnonymously,
-            signInWithCustomToken,
-            signOut, // <-- TAMBAH INI
-            getFirestore,
-            setLogLevel,
-            doc,
-            getDoc,
-            addDoc,
-            setDoc,
-            updateDoc,
-            deleteDoc,
-            onSnapshot,
-            collection,
-            query,
-            writeBatch
-        };
-    </script>
-
-    <!-- Pautkan fail JavaScript utama anda -->
-    <script src="script.js"></script>
-
-    <!--
-      STRUKTUR MODAL (TERSEMBUNYI SECARA LALAI)
-    -->
-
-    <!-- 1. Modal Pengesahan Padam (Delete Confirmation) -->
-    <div id="delete-modal" class="modal-overlay">
-        <div class="modal-box">
-            <h3 class="text-lg font-bold text-red-700">Sahkan Padam Aset</h3>
-            <p class="mt-2 text-sm text-gray-600">Adakah anda pasti mahu memadam aset ini? Aset yang sedang dipinjam tidak boleh dipadam. Tindakan ini tidak boleh diundur.</p>
+    <!-- (DIUBAH) Modal Pengesahan Padam (Aset) -->
+    <div id="delete-modal" class="modal fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-lg font-medium text-gray-900">Padam Aset</h3>
+            <p class="mt-2 text-sm text-gray-600">Adakah anda pasti mahu memadam aset ini? Tindakan ini tidak boleh diundur.</p>
             <div id="delete-modal-error" class="mt-2 text-sm text-red-600 hidden"></div>
-            <div class="mt-6 flex justify-end space-x-3">
-                <button id="btn-cancel-delete" type="button" class="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
-                    Batal
-                </button>
-                <button id="btn-confirm-delete" type="button" class="rounded-md border border-transparent bg-red-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-red-700">
-                    Padam
-                </button>
+            <div class="mt-4 flex justify-end space-x-2">
+                <button id="btn-cancel-delete" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Batal</button>
+                <button id="btn-confirm-delete" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Padam</button>
             </div>
         </div>
     </div>
 
-    <!-- 2. Modal Kemaskini Aset (Edit Asset) -->
-    <div id="edit-modal" class="modal-overlay">
-        <div class="modal-box">
-            <h3 class="text-lg font-bold text-blue-700">Kemaskini Aset</h3>
+    <!-- (DIUBAH) Modal Edit Aset -->
+    <div id="edit-modal" class="modal fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-lg font-medium text-gray-900">Edit Aset</h3>
+            <p class="mt-1 text-sm text-gray-600">Status Aset: <span id="edit-asset-status" class="font-medium"></span></p>
             <form id="edit-asset-form" class="mt-4 space-y-4">
                 <div>
                     <label for="edit-asset-name" class="block text-sm font-medium text-gray-700">Nama Aset</label>
@@ -191,24 +85,79 @@
                         <option value="Lain-lain">Lain-lain</option>
                     </select>
                 </div>
-                <!-- Status tidak boleh diedit secara manual di sini, ia dikawal oleh pinjaman -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Status</label>
-                    <span id="edit-asset-status" class="mt-1 block w-full rounded-md bg-gray-100 py-2 px-3 text-gray-500"></span>
-                </div>
-                <div class="mt-6 flex justify-end space-x-3">
-                    <button id="btn-cancel-edit" type="button" class="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
-                        Batal
-                    </button>
-                    <button type="submit" class="rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700">
-                        Simpan Perubahan
-                    </button>
+                <div class="flex justify-end space-x-2">
+                    <button type="button" id="btn-cancel-edit" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Batal</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Simpan</button>
                 </div>
             </form>
         </div>
     </div>
+    
+    <!-- (BARU) Modal Log Masuk Admin (seperti image_61fb55.png) -->
+    <div id="admin-login-modal" class="modal fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4 relative">
+            <!-- Butang Tutup (X) -->
+            <button id="btn-close-admin-login" class="absolute top-3 right-3 text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Log Masuk Admin</h3>
+            <form id="admin-login-form" class="space-y-4">
+                <div>
+                    <label for="admin-email" class="block text-sm font-medium text-gray-700">E-mel</label>
+                    <input type="email" id="admin-email" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm h-10 px-3" required>
+                </div>
+                <div>
+                    <label for="admin-password" class="block text-sm font-medium text-gray-700">Kata Laluan</label>
+                    <input type="password" id="admin-password" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm h-10 px-3" required>
+                </div>
+                <!-- Mesej Ralat -->
+                <div id="admin-login-error" class="text-sm text-red-600 hidden"></div>
+                <!-- Butang Hantar -->
+                <button type="submit" id="btn-admin-login-submit" class="w-full rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700">
+                    Log Masuk
+                </button>
+            </form>
+        </div>
+    </div>
 
+
+    <!-- Skrip Firebase -->
+    <!-- Tukar kepada 'type="module"' untuk membenarkan 'import' -->
+    <script type="module">
+        // Import semua fungsi Firebase yang kita perlukan
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            onAuthStateChanged, 
+            signInAnonymously, 
+            signInWithCustomToken, 
+            signOut,
+            signInWithEmailAndPassword // (BARU) Import untuk log masuk E-mel/Kata Laluan
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            setLogLevel, 
+            doc, 
+            getDoc, 
+            collection, 
+            onSnapshot, 
+            addDoc, 
+            writeBatch, 
+            updateDoc, 
+            deleteDoc 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Letakkan semua fungsi pada objek 'window.firebase' supaya script.js boleh capai
+        window.firebase = {
+            initializeApp,
+            getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken, signOut, signInWithEmailAndPassword, // (BARU)
+            getFirestore, setLogLevel, doc, getDoc, collection, onSnapshot, addDoc, writeBatch, updateDoc, deleteDoc
+        };
+    </script>
+    
+    <!-- Skrip Aplikasi Utama -->
+    <script src="script.js"></script>
 </body>
 </html>
-
 

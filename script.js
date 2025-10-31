@@ -92,17 +92,30 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     async function checkAdminStatus(uid) {
         const { doc, getDoc } = window.firebase;
-        // Semak dokumen dalam koleksi khas untuk admin
-        // ANDA MESTI BUAT KOLEKSI INI DI FIREBASE: /artifacts/{appId}/public/data/admins/{uid}
-        try {
-            const adminDocRef = doc(db, `/artifacts/${appId}/public/data/admins`, uid);
-            const adminDoc = await getDoc(adminDocRef);
-            
-            globalState.isAdmin = adminDoc.exists(); // true jika dokumen wujud
-            
-        } catch (error) {
-            console.error("Ralat menyemak status admin:", error);
-            globalState.isAdmin = false; // Anggap bukan admin jika berlaku ralat
+        const user = globalState.currentUser; // Ambil currentUser yang sudah disimpan
+
+        // Senarai e-mel admin yang dibenarkan (seperti yang diminta)
+        const adminEmails = [
+            "gurubesar@sksa.com",
+            "guruict@sksa.com"
+        ];
+
+        // Semak jika e-mel pengguna ada dalam senarai
+        if (user && user.email && adminEmails.includes(user.email)) {
+            globalState.isAdmin = true;
+        } else {
+            // Jika e-mel tiada, semak koleksi 'admins' di Firestore menggunakan UID (cara lama)
+            // Ini membenarkan kedua-dua cara berfungsi
+            try {
+                const adminDocRef = doc(db, `/artifacts/${appId}/public/data/admins`, uid);
+                const adminDoc = await getDoc(adminDocRef);
+                
+                globalState.isAdmin = adminDoc.exists(); // true jika dokumen wujud
+                
+            } catch (error) {
+                console.error("Ralat menyemak status admin:", error);
+                globalState.isAdmin = false; // Anggap bukan admin jika berlaku ralat
+            }
         }
 
         // Tetapkan tab lalai berdasarkan status
@@ -755,4 +768,5 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 });
+
 

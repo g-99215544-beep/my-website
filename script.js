@@ -70,10 +70,6 @@ async function connectToFirebase() {
         const app = initializeApp(firebaseConfig);
         auth = getAuth(app);
         db = getFirestore(app);
-
-        // Tetapkan log level (berguna untuk debug)
-        // setAuthLogLevel('Debug'); // Dibuang - Tidak dieksport oleh Firebase v11 CDN
-        // setFirestoreLogLevel('Debug'); // Dibuang - Tidak dieksport oleh Firebase v11 CDN
         
         // 2. Pasang pendengar Auth
         setupAuthListeners();
@@ -206,11 +202,21 @@ function attachFirestoreListeners(appId, userId) {
     // 1. Pendengar untuk Aset (Koleksi Awam)
     // Laluan: /artifacts/{appId}/public/data/assets
     const assetsPath = `assets`; // Dipermudahkan untuk pembangunan
-    const assetsQuery = query(collection(db, assetsPath), orderBy('name'));
+    // (FIX) Buang orderBy('name') untuk mengelakkan ralat indeks
+    const assetsQuery = query(collection(db, assetsPath)); 
     
     assetsListener = onSnapshot(assetsQuery, (snapshot) => {
-        const assets = snapshot.docs.map(doc => ({ id: doc.id, data: doc.data() }));
+        let assets = snapshot.docs.map(doc => ({ id: doc.id, data: doc.data() }));
         
+        // (FIX) Isih (sort) di sini menggunakan JavaScript
+        assets.sort((a, b) => {
+            const nameA = a.data.name.toLowerCase();
+            const nameB = b.data.name.toLowerCase();
+            if (nameA < nameB) return -1;
+            if (nameA > nameB) return 1;
+            return 0;
+        });
+    
         // Hantar data aset ke semua tab yang memerlukannya
         updatePermohonanAssets(assets);
         updateAsetTersedia(assets);

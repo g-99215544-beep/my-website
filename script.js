@@ -321,7 +321,51 @@ document.addEventListener('DOMContentLoaded', () => {
             return acc;
         }, {});
 
+        // (BARU) Cipta HTML borang admin
+        let adminFormHtml = '';
+        if (globalState.isAdmin) {
+            // Jika pengguna adalah admin, tambah borang "Tambah Aset Pukal" di atas
+            adminFormHtml = `
+            <!-- (BARU) Bahagian Tambah Aset Baru (Pukal) -->
+            <div class="mb-6 bg-white rounded-lg shadow border border-gray-200">
+                <button class="accordion-toggle flex w-full justify-between items-center p-5">
+                    <h2 class="text-xl font-bold text-gray-800">Tambah Aset Pukal (Admin)</h2>
+                    <svg class="accordion-icon w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                </button>
+                <div class="accordion-content p-5 border-t border-gray-200 hidden">
+                    <form id="add-asset-form" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div class="md:col-span-2">
+                                <label for="asset-base-name" class="block text-sm font-medium text-gray-700">Nama Asas</label>
+                                <input type="text" id="asset-base-name" placeholder="Cth: Tablet Makmal" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            </div>
+                            <div>
+                                <label for="asset-quantity" class="block text-sm font-medium text-gray-700">Jumlah</label>
+                                <input type="number" id="asset-quantity" placeholder="Cth: 10" min="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                            </div>
+                            <div>
+                                <label for="asset-category" class="block text-sm font-medium text-gray-700">Kategori</label>
+                                <select id="asset-category" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
+                                    <option value="">Pilih Kategori</option>
+                                    <option value="Laptop">Laptop</option>
+                                    <option value="Tablet">Tablet</option>
+                                    <option value="Projector">Projector</option>
+                                    <option value="Lain-lain">Lain-lain</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700">
+                            Tambah Aset Pukal
+                        </button>
+                    </form>
+                </div>
+            </div>
+            `;
+        }
+
         return `
+            ${adminFormHtml} <!-- (BARU) Masukkan borang admin di sini -->
+
             <div class="bg-white rounded-lg shadow p-6">
                 <h2 class="text-2xl font-bold text-green-700 mb-4">Aset Tersedia (Paparan Sahaja)</h2>
                 <div class="space-y-4">
@@ -973,5 +1017,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- MULAKAN APLIKASI ---
     initializeFirebaseApp();
 });
+
 
 

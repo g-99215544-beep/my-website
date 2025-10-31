@@ -1,4 +1,3 @@
-// Import fungsi utama dari Firebase (melalui tetingkap global)
 const { 
     initializeApp, 
     getAuth, signInAnonymously, signInWithCustomToken, signInWithEmailAndPassword, onAuthStateChanged, signOut,
@@ -312,4 +311,5 @@ function handleTabClick(e) {
         activePanel.classList.add('active');
     }
 }
+
 

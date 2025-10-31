@@ -1,7 +1,4 @@
-// Import fungsi utama dari Firebase (melalui tetingkap global)
-const { 
-    doc, getDoc, collection, addDoc, setDoc, updateDoc, deleteDoc, serverTimestamp
-} = window.firebase;
+// (FIX) Alih keluar import Firebase yang rosak dari bahagian atas fail ini.
 
 // Simpan rujukan 'db' apabila ia diinisialisasi dalam script.js
 let db;

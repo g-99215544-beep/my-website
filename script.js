@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- ELEMEN MODAL ---
     const deleteModal = document.getElementById('delete-modal');
     const editModal = document.getElementById('edit-modal');
+    const adminLoginModal = document.getElementById('admin-login-modal'); // (BARU)
 
     // --- INISIALISASI FIREBASE ---
     // Pembolehubah untuk perkhidmatan Firebase
@@ -33,7 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Dapatkan semua fungsi yang diperlukan dari 'window.firebase' (dari index.html)
         const {
             initializeApp, getAuth, onAuthStateChanged, signInAnonymously,
-            signInWithCustomToken, getFirestore, setLogLevel, doc, getDoc
+            signInWithCustomToken, getFirestore, setLogLevel, doc, getDoc,
+            signInWithEmailAndPassword // (BARU)
         } = window.firebase;
 
         try {
@@ -130,9 +132,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // (DIUBAH) Paparan Guru
             userDisplay = `<span class="text-sm text-gray-700" title="${user.email || user.uid}">Mod Guru (ID: ${user.uid.substring(0, 6)})</span>`;
             // Butang Log Masuk Admin (Biru) - seperti dalam image_618260.png
-            // Butang ini akan log keluar, membenarkan pengguna log masuk sebagai admin
+            // (DIUBAH) Butang ini kini menunjukkan modal, bukan log keluar
             authButton = `
-                <button id="btn-logout" class="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700">
+                <button id="btn-show-admin-login" class="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700">
                     Log Masuk Admin
                 </button>
             `;
@@ -144,22 +146,13 @@ document.addEventListener('DOMContentLoaded', () => {
             ${authButton}
         `;
 
-        // Tambah event listener untuk log keluar (kedua-dua butang berkongsi ID dan fungsi)
-        document.getElementById('btn-logout').addEventListener('click', handleLogout);
-    }
-
-    /**
-     * (BARU) Fungsi untuk mengendalikan Log Keluar
-     */
-    async function handleLogout() {
-        const { signOut } = window.firebase;
-        try {
-            await signOut(auth);
-            // Muat semula halaman untuk mencetuskan aliran log masuk yang baru
-            location.reload(); 
-        } catch (error) {
-            console.error("Ralat log keluar:", error);
-            alert("Gagal log keluar.");
+        // (DIUBAH) Tambah event listener berdasarkan apa yang dipaparkan
+        if (globalState.isAdmin) {
+            // Admin nampak butang "Log Keluar"
+            document.getElementById('btn-logout').addEventListener('click', handleLogout);
+        } else {
+            // Guru nampak butang "Log Masuk Admin"
+            document.getElementById('btn-show-admin-login').addEventListener('click', handleShowAdminLoginModal);
         }
     }
 
@@ -641,7 +634,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 contentArea.innerHTML = `<p>Tab tidak dijumpai.</p>`;
         }
         
-        // Pautkan semula semua pendengar acara (event listeners)
+            // Pautkan semula semua pendengar acara (event listeners)
         attachEventListeners();
     }
     
@@ -708,6 +701,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('btn-confirm-delete').addEventListener('click', handleConfirmDelete);
         document.getElementById('btn-cancel-edit').addEventListener('click', handleCancelEdit);
         document.getElementById('edit-asset-form').addEventListener('submit', handleUpdateAsset);
+        
+        // (BARU) Pendengar Acara untuk Modal Log Masuk Admin
+        document.getElementById('btn-close-admin-login').addEventListener('click', handleCloseAdminLoginModal);
+        document.getElementById('admin-login-form').addEventListener('submit', handleAdminLoginSubmit);
     }
 
 
@@ -830,6 +827,71 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    // --- (BARU) Tindakan Modal Log Masuk Admin ---
+
+    /**
+     * (BARU) Menunjukkan modal log masuk admin
+     */
+    function handleShowAdminLoginModal() {
+        adminLoginModal.style.display = 'flex';
+        // Kosongkan medan dan ralat lama
+        document.getElementById('admin-login-form').reset();
+        document.getElementById('admin-login-error').classList.add('hidden');
+        document.getElementById('admin-login-error').textContent = '';
+    }
+
+    /**
+     * (BARU) Menutup modal log masuk admin
+     */
+    function handleCloseAdminLoginModal() {
+        adminLoginModal.style.display = 'none';
+    }
+    
+    /**
+     * (BARU) Mengendalikan hantaran borang log masuk admin
+     */
+    async function handleAdminLoginSubmit(event) {
+        event.preventDefault();
+        const { signInWithEmailAndPassword } = window.firebase;
+        
+        const email = document.getElementById('admin-email').value;
+        const password = document.getElementById('admin-password').value;
+        const errorDiv = document.getElementById('admin-login-error');
+        const submitButton = document.getElementById('btn-admin-login-submit');
+
+        try {
+            submitButton.disabled = true;
+            submitButton.textContent = 'Memproses...';
+            errorDiv.classList.add('hidden');
+            
+            // Cuba log masuk dengan e-mel dan kata laluan
+            await signInWithEmailAndPassword(auth, email, password);
+            
+            // Jika berjaya:
+            // 1. onAuthStateChanged akan berjalan secara automatik
+            // 2. Ia akan mengesan e-mel admin (jika betul)
+            // 3. Ia akan render semula header dan UI sebagai admin
+            // 4. Tutup modal
+            handleCloseAdminLoginModal();
+
+        } catch (error) {
+            console.error("Ralat log masuk admin:", error.code);
+            // Paparkan mesej ralat
+            if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+                errorDiv.textContent = 'E-mel atau kata laluan salah. Sila cuba lagi.';
+            } else if (error.code === 'auth/invalid-email') {
+                errorDiv.textContent = 'Format e-mel tidak sah.';
+            } else {
+                errorDiv.textContent = 'Berlaku ralat. Sila cuba lagi.';
+            }
+            errorDiv.classList.remove('hidden');
+        } finally {
+            submitButton.disabled = false;
+            submitButton.textContent = 'Log Masuk';
+        }
+    }
+
+
     // --- Tindakan Admin (Kelulusan) ---
 
     async function handleApproveLoan(event) {
@@ -1017,6 +1079,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- MULAKAN APLIKASI ---
     initializeFirebaseApp();
 });
+
 
 
 

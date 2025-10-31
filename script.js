@@ -115,23 +115,36 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         let userDisplay = '';
+        let authButton = ''; // (BARU) Pembolehubah untuk butang
+
         if (globalState.isAdmin) {
-            // Papar e-mel untuk admin
+            // (DIUBAH) Paparan Admin
             userDisplay = `<span class="text-sm font-medium text-red-700" title="ID: ${user.uid}">Admin: ${user.email || 'Mod Admin'}</span>`;
+            // Butang Log Keluar (Merah) - seperti dalam image_6182bc.png
+            authButton = `
+                <button id="btn-logout" class="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-red-700">
+                    Log Keluar
+                </button>
+            `;
         } else {
-            // Papar ID ringkas untuk guru
+            // (DIUBAH) Paparan Guru
             userDisplay = `<span class="text-sm text-gray-700" title="${user.email || user.uid}">Mod Guru (ID: ${user.uid.substring(0, 6)})</span>`;
+            // Butang Log Masuk Admin (Biru) - seperti dalam image_618260.png
+            // Butang ini akan log keluar, membenarkan pengguna log masuk sebagai admin
+            authButton = `
+                <button id="btn-logout" class="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700">
+                    Log Masuk Admin
+                </button>
+            `;
         }
 
         // HTML untuk butang log keluar
         authSection.innerHTML = `
             ${userDisplay}
-            <button id="btn-logout" class="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700">
-                Log Keluar
-            </button>
+            ${authButton}
         `;
 
-        // Tambah event listener untuk log keluar
+        // Tambah event listener untuk log keluar (kedua-dua butang berkongsi ID dan fungsi)
         document.getElementById('btn-logout').addEventListener('click', handleLogout);
     }
 
@@ -960,4 +973,5 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- MULAKAN APLIKASI ---
     initializeFirebaseApp();
 });
+
 

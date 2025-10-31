@@ -44,8 +44,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             // 1. Dapatkan Konfigurasi Firebase
-            // __firebase_config disediakan secara global dalam persekitaran
-            const firebaseConfig = JSON.parse(__firebase_config);
+            let firebaseConfig;
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                // Gunakan config global jika ada (persekitaran Canvas)
+                firebaseConfig = JSON.parse(__firebase_config);
+            } else {
+                // JIKA GAGAL: Guna config sandaran (fallback) yang anda berikan sebelum ini
+                // Ini untuk membenarkan aplikasi berjalan di luar persekitaran Canvas.
+                console.warn("Pembolehubah global __firebase_config tidak ditemui. Menggunakan konfigurasi sandaran.");
+                firebaseConfig = {
+                    apiKey: "AIzaSyCV5skKQO1i-T6pOckTEyhDG8H4fh7vS7s",
+                    authDomain: "sistem-pinjaman-aset-ict-v2.firebaseapp.com",
+                    projectId: "sistem-pinjaman-aset-ict-v2",
+                    storageBucket: "sistem-pinjaman-aset-ict-v2.firebasestorage.app",
+                    messagingSenderId: "1013418266777",
+                    appId: "1:1013418266777:web:f3ec4d5f38fe7b87b76808",
+                    measurementId: "G-9CQDWM207Z"
+                };
+            }
             
             // 2. Inisialisasi Aplikasi Firebase
             const app = initializeApp(firebaseConfig);
@@ -66,7 +82,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     // Tiada pengguna log masuk, cuba log masuk
                     try {
-                        if (typeof __initial_auth_token !== 'undefined') {
+                        // (DIKEMASKINI) Semak jika __initial_auth_token wujud DAN tidak kosong
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                             // Log masuk menggunakan token khas jika ada
                             await signInWithCustomToken(auth, __initial_auth_token);
                         } else {
@@ -1001,5 +1018,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 });
+
 
 

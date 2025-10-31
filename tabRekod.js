@@ -1,594 +1,782 @@
-// === TABREKOD.JS ===
-// Menguruskan semua logik untuk Tab 4: Rekod (Panel Admin)
+// (FIX) Alih keluar import Firebase yang rosak dari bahagian atas fail ini.
 
-// Import fungsi utama dari Firebase (melalui tetingkap global)
-const { doc, updateDoc, deleteDoc, writeBatch, collection, addDoc, serverTimestamp, getDocs, where, query } = window.firebase;
-// Import fungsi bantuan
-import { showMessage, showConfirm, playSound, renderAssetItem, openEditAssetModal, closeEditAssetModal, handleSaveAsset } from './utils.js';
+// Import modul Utiliti
+import { showMessage, showConfirm, renderAssetItem, playSound } from './utils.js';
 
-// Rujukan global dari script.js
-let db;
-let allAssets = []; // Cache tempatan aset
-let allLoans = []; // Cache tempatan pinjaman
+// Rujukan DOM
+const adminPanel = document.getElementById('panel-admin-rekod');
+const adminNav = document.getElementById('admin-nav');
+const adminContent = document.getElementById('admin-content');
+const schoolNameInput = document.getElementById('school-name-input');
+const saveSchoolNameBtn = document.getElementById('save-school-name');
+const bulkAssetForm = document.getElementById('bulk-asset-form');
+const bulkAssetInput = document.getElementById('bulk-asset-input');
 
-// Rujukan DOM Panel Admin
-const adminPanel = document.getElementById('admin-panel');
-const loansListBody = document.getElementById('loans-list');
-const pendingBadge = document.getElementById('pending-badge');
-const pendingBadgeMain = document.getElementById('pending-badge-main');
-const clearRecordsBtn = document.getElementById('clear-records-btn');
+// Rujukan DOM - Panel Pengurus Pinjaman
+const loanManagerPanel = document.getElementById('admin-panel-loans');
+const pendingList = document.getElementById('pending-loan-list');
+const pendingLoading = document.getElementById('pending-loan-loading');
+const historyList = document.getElementById('history-loan-list');
+const historyLoading = document.getElementById('history-loan-loading');
+const historyFilter = document.getElementById('history-loan-filter');
 
-// Rujukan DOM Borang Tambah Pukal
-const bulkAddForm = document.getElementById('bulk-add-form');
-const bulkAddButton = document.getElementById('bulk-add-button');
-const bulkAddStatus = document.getElementById('bulk-add-status');
-
-// Rujukan DOM Edit Pinjaman
-const editLoanModal = document.getElementById('edit-loan-modal');
-const editLoanForm = document.getElementById('edit-loan-form');
-const closeEditLoanModalBtn = document.getElementById('close-edit-modal');
-const editLoanError = document.getElementById('edit-loan-error');
-
-// Rujukan DOM Pengurus Aset
-const openAssetManagerBtn = document.getElementById('open-asset-manager-btn');
-const assetManagerModal = document.getElementById('asset-manager-modal');
-const closeAssetManagerBtn = document.getElementById('close-asset-manager-btn');
+// Rujukan DOM - Panel Pengurus Aset
+const assetManagerPanel = document.getElementById('admin-panel-assets');
 const assetManagerList = document.getElementById('asset-manager-list');
-const editAssetModal = document.getElementById('edit-asset-modal');
-const editAssetForm = document.getElementById('edit-asset-form');
-const closeEditAssetBtn = document.getElementById('close-edit-asset-btn');
+const assetManagerLoading = document.getElementById('asset-manager-loading');
+const assetManagerFilter = document.getElementById('asset-manager-filter');
 
+let db; // Akan ditetapkan oleh initTabRekod
+let allLoans = []; // Simpan semua pinjaman
+let allAssets = []; // Simpan semua aset
+let currentAdminView = 'loans'; // 'loans' atau 'assets'
 
-// Fungsi utama untuk memulakan tab ini
+// Fungsi untuk memulakan tab rekod (Admin)
 export function initTabRekod(database) {
     db = database;
-    
-    // Pindahkan panel admin ke dalam tab
-    const adminPanelContainer = document.getElementById('panel-admin-rekod');
-    adminPanelContainer.appendChild(adminPanel);
+    adminNav.addEventListener('click', handleAdminNavClick);
+    saveSchoolNameBtn.addEventListener('click', saveSchoolName);
+    bulkAssetForm.addEventListener('submit', handleBulkAssetAdd);
+    historyFilter.addEventListener('input', (e) => filterAndDisplayHistory(e.target.value));
+    assetManagerFilter.addEventListener('input', (e) => filterAndDisplayAssets(e.target.value));
 
-    // Tambah pendengar acara (Event Listeners)
-    loansListBody.addEventListener('click', handleLoanAction);
-    clearRecordsBtn.addEventListener('click', clearOldRecords);
-    
-    // Borang Tambah Pukal
-    bulkAddForm.addEventListener('submit', handleBulkAdd);
-    
-    // Modal Edit Pinjaman
-    editLoanForm.addEventListener('submit', handleSaveLoanEdit);
-    closeEditLoanModalBtn.addEventListener('click', () => editLoanModal.classList.add('hidden'));
-
-    // Modal Pengurus Aset
-    openAssetManagerBtn.addEventListener('click', openAssetManager);
-    closeAssetManagerBtn.addEventListener('click', () => assetManagerModal.classList.add('hidden'));
-    assetManagerList.addEventListener('click', handleAssetManagerAction);
-    
-    // Modal Edit Aset
-    editAssetForm.addEventListener('submit', (e) => handleSaveAsset(e, db));
-    closeEditAssetBtn.addEventListener('click', closeEditAssetModal);
+    // Tambah pendengar untuk senarai (event delegation)
+    pendingList.addEventListener('click', handlePendingListClick);
+    historyList.addEventListener('click', handleHistoryListClick);
+    assetManagerList.addEventListener('click', handleAssetManagerClick);
 }
 
-// Tunjukkan panel admin jika log masuk
+// Fungsi untuk tunjuk/sembunyi panel Admin (dipanggil dari script.js)
 export function showAdminPanel(isAdmin) {
     const rekodTabButton = document.querySelector('button[data-tab="rekod"]');
     if (isAdmin) {
         rekodTabButton.classList.remove('hidden');
-        adminPanel.classList.remove('hidden'); // Tunjukkan panel sebenar
     } else {
         rekodTabButton.classList.add('hidden');
-        adminPanel.classList.add('hidden'); // Sembunyikan panel sebenar
+        // Jika admin log keluar semasa melihat tab admin, paksa kembali ke tab 'permohonan'
+        if (adminPanel.classList.contains('active')) {
+            document.querySelector('button[data-tab="permohonan"]').click();
+        }
     }
 }
 
-// Kemas kini paparan rekod pinjaman (dipanggil dari script.js)
-export function updateRekodPinjaman(loans) {
-    allLoans = loans; // Simpan cache
-    loansListBody.innerHTML = '';
+// === PENGURUSAN SUB-NAVIGASI ADMIN ===
+
+function handleAdminNavClick(e) {
+    const clickedBtn = e.target.closest('button.admin-nav-button');
+    if (!clickedBtn || clickedBtn.classList.contains('active')) return;
     
-    // Isih: Pending dahulu, kemudian mengikut tarikh permohonan (terbaru dahulu)
-    loans.sort((a, b) => {
-        const statusA = a.data.status;
-        const statusB = b.data.status;
-        const dateA = a.data.requestedAt ? a.data.requestedAt.toMillis() : 0;
-        const dateB = b.data.requestedAt ? b.data.requestedAt.toMillis() : 0;
+    currentAdminView = clickedBtn.dataset.panel;
 
-        // Utamakan 'Pending'
-        if (statusA === 'Pending' && statusB !== 'Pending') return -1;
-        if (statusA !== 'Pending' && statusB === 'Pending') return 1;
+    // Kemas kini butang
+    adminNav.querySelectorAll('.admin-nav-button').forEach(btn => {
+        btn.classList.remove('active', 'bg-blue-600', 'text-white');
+        btn.classList.add('text-gray-600', 'hover:bg-gray-100');
+    });
+    clickedBtn.classList.add('active', 'bg-blue-600', 'text-white');
+    clickedBtn.classList.remove('text-gray-600', 'hover:bg-gray-100');
 
-        // Jika kedua-dua 'Pending' atau kedua-dua bukan 'Pending', isih ikut tarikh (terbaru dahulu)
-        return dateB - dateA;
+    // Kemas kini panel
+    adminContent.querySelectorAll('.admin-panel').forEach(panel => {
+        panel.classList.add('hidden');
+    });
+    
+    if (currentAdminView === 'loans') {
+        loanManagerPanel.classList.remove('hidden');
+    } else if (currentAdminView === 'assets') {
+        assetManagerPanel.classList.remove('hidden');
+    } else if (currentAdminView === 'settings') {
+        document.getElementById('admin-panel-settings').classList.remove('hidden');
+    }
+}
+
+
+// === PENGURUSAN TETAPAN (SETTINGS) ===
+
+async function saveSchoolName() {
+    const newName = schoolNameInput.value;
+    if (!newName) {
+        showMessage('Ralat', 'Nama sekolah tidak boleh kosong.');
+        playSound('error');
+        return;
+    }
+    
+    const confirmed = await showConfirm('Simpan Nama Sekolah', `Anda pasti mahu menetapkan nama sekolah kepada "${newName}"?`);
+    if (!confirmed) return;
+
+    // Ambil ID Aplikasi (disediakan oleh Canvas)
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    
+    try {
+        // Laluan (path) dokumen: artifacts/{appId}/public/data/school_info/details
+        // (FIX) Panggil window.firebase secara terus
+        const schoolInfoRef = window.firebase.doc(db, `artifacts/${appId}/public/data/school_info`, 'details');
+        await window.firebase.setDoc(schoolInfoRef, { name: newName });
+        showMessage('Berjaya', 'Nama sekolah telah dikemas kini.');
+        playSound('success');
+    } catch (error) {
+        console.error("Ralat simpan nama sekolah:", error);
+        showMessage('Ralat', 'Gagal menyimpan nama sekolah.');
+        playSound('error');
+    }
+}
+
+
+// === PENGURUS PINJAMAN (LOAN MANAGER) ===
+
+// Fungsi untuk menerima kemas kini pinjaman dari script.js
+export function updateRekodPinjaman(loans) {
+    allLoans = loans;
+    
+    // Paparkan pinjaman 'Pending'
+    displayPendingLoans();
+    
+    // Paparkan sejarah (yang bukan 'Pending')
+    filterAndDisplayHistory(historyFilter.value);
+}
+
+// Paparkan pinjaman 'Pending'
+function displayPendingLoans() {
+    pendingLoading.classList.add('hidden');
+    pendingList.innerHTML = '';
+    
+    const pendingLoans = allLoans.filter(loan => loan.data.status === 'Pending');
+    
+    // Isih (sort) yang paling lama di atas
+    pendingLoans.sort((a, b) => a.data.requestedAt?.toMillis() - b.data.requestedAt?.toMillis());
+
+    if (pendingLoans.length > 0) {
+        pendingLoans.forEach(loan => {
+            pendingList.innerHTML += renderPendingLoanItem(loan.id, loan.data);
+        });
+    } else {
+        pendingList.innerHTML = '<p class="text-gray-500 italic">Tiada permohonan pinjaman baharu.</p>';
+    }
+}
+
+// Tapis dan paparkan sejarah pinjaman (Bukan 'Pending')
+function filterAndDisplayHistory(searchTerm) {
+    historyLoading.classList.add('hidden');
+    historyList.innerHTML = '';
+    
+    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+
+    // Ambil semua KECUALI 'Pending'
+    const historyLoans = allLoans.filter(loan => loan.data.status !== 'Pending');
+
+    // Tapis berdasarkan carian
+    const filteredLoans = historyLoans.filter(loan => {
+        const name = loan.data.applicantName?.toLowerCase() || '';
+        const ic = loan.data.applicantIC || '';
+        const status = loan.data.status?.toLowerCase() || '';
+        
+        const assetMatch = loan.data.assets.some(asset => 
+            (asset.name?.toLowerCase() || '').includes(lowerCaseSearchTerm) ||
+            (asset.serialNumber?.toLowerCase() || '').includes(lowerCaseSearchTerm)
+        );
+
+        return name.includes(lowerCaseSearchTerm) || 
+               ic.includes(lowerCaseSearchTerm) ||
+               status.includes(lowerCaseSearchTerm) ||
+               assetMatch;
     });
 
-    let pendingCount = 0;
-
-    if (loans.length === 0) {
-        loansListBody.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500 italic">Tiada rekod pinjaman ditemui.</td></tr>';
-    } else {
-        loans.forEach(loan => {
-            const rowHtml = renderLoanRow(loan.id, loan.data);
-            loansListBody.innerHTML += rowHtml;
-            if (loan.data.status === 'Pending') {
-                pendingCount++;
-            }
+    if (filteredLoans.length > 0) {
+        // Isih (sort) yang paling baru di atas
+        filteredLoans.sort((a, b) => {
+            const dateA = a.data.returnedAt || a.data.approvedAt || a.data.requestedAt;
+            const dateB = b.data.returnedAt || b.data.approvedAt || b.data.requestedAt;
+            return dateB?.toMillis() - dateA?.toMillis();
         });
-    }
-
-    // Kemas kini 'badge' notifikasi
-    if (pendingCount > 0) {
-        pendingBadge.textContent = pendingCount;
-        pendingBadgeMain.textContent = pendingCount;
-        pendingBadge.classList.remove('hidden');
-        pendingBadgeMain.classList.remove('hidden');
+        
+        filteredLoans.forEach(loan => {
+            historyList.innerHTML += renderHistoryLoanItem(loan.id, loan.data);
+        });
     } else {
-        pendingBadge.classList.add('hidden');
-        pendingBadgeMain.classList.add('hidden');
+        if (historyLoans.length === 0) {
+            historyList.innerHTML = '<p class="text-gray-500 italic">Tiada sejarah pinjaman lagi.</p>';
+        } else {
+            historyList.innerHTML = '<p class="text-gray-500 italic">Tiada rekod sepadan dengan carian anda.</p>';
+        }
     }
 }
 
-// Kemas kini cache aset (dipanggil dari script.js)
-export function updateRekodAssets(assets) {
-    allAssets = assets;
-    // Jika modal pengurus aset terbuka, muat semula senarainya
-    if (!assetManagerModal.classList.contains('hidden')) {
-        openAssetManager();
-    }
-}
+// --- Paparan HTML untuk Pinjaman ---
 
-
-// --- FUNGSI-FUNGSI BANTUAN ---
-
-// (A) Logik Paparan Jadual Pinjaman
-
-function renderLoanRow(id, data) {
-    const assetsHtml = data.assets.map(asset => 
-        `<li class="text-sm" title="ID: ${asset.id}">${asset.name} ${asset.groupName ? `(${asset.groupName})` : ''}</li>`
-    ).join('');
+function renderPendingLoanItem(loanId, loanData) {
+    const requestedDate = loanData.requestedAt?.toDate().toLocaleString('ms-MY') || 'N/A';
     
-    const startDate = new Date(data.startDate).toLocaleDateString('ms-MY', { day: '2-digit', month: 'short' });
-    const endDate = new Date(data.endDate).toLocaleDateString('ms-MY', { day: '2-digit', month: 'short' });
-
-    let statusHtml = '';
-    let actionsHtml = '';
-
-    switch (data.status) {
-        case 'Pending':
-            statusHtml = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Menunggu</span>';
-            actionsHtml = `
-                <button class="approve-btn text-green-600 hover:text-green-800" title="Luluskan">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
-                </button>
-                <button class="reject-btn text-red-600 hover:text-red-800" title="Tolak">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
-                </button>
-                <button class="edit-btn text-blue-600 hover:text-blue-800" title="Edit">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
-                </button>
-            `;
-            break;
-        case 'Approved':
-            statusHtml = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Diluluskan</span>';
-            actionsHtml = `
-                <button class="return-btn text-blue-600 hover:text-blue-800" title="Tanda Sbg Dipulangkan">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.707-10.293a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L9.414 11H13a1 1 0 100-2H9.414l1.293-1.293z" clip-rule="evenodd" /></svg>
-                </button>
-            `;
-            break;
-        case 'Returned':
-            statusHtml = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Dipulangkan</span>';
-            actionsHtml = `
-                <button class="delete-btn text-gray-400 hover:text-red-600" title="Padam Rekod">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
-                </button>
-            `;
-            break;
-        case 'Rejected':
-            statusHtml = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Ditolak</span>';
-            actionsHtml = `
-                <button class="delete-btn text-gray-400 hover:text-red-600" title="Padam Rekod">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
-                </button>
-            `;
-            break;
-        default:
-            statusHtml = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">${data.status}</span>`;
-    }
-
     return `
-        <tr data-id="${id}" class="${data.status === 'Pending' ? 'bg-yellow-50' : ''}">
-            <td class="px-6 py-4 whitespace-nowrap">
-                <div class="flex items-center space-x-2">
-                    ${actionsHtml}
-                </div>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm font-medium text-gray-900">${data.teacherName}</div>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm text-gray-700">${data.teacherIC}</div>
-            </td>
-            <td class="px-6 py-4">
-                <ul class="list-disc list-inside">${assetsHtml}</ul>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm text-gray-700">${startDate}</div>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm text-gray-700">${endDate}</div>
-            </td>
-            <td class="px-6 py-4">
-                <div class="text-sm text-gray-700 max-w-xs truncate" title="${data.purpose}">${data.purpose}</div>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-                ${statusHtml}
-            </td>
-        </tr>
+        <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm space-y-3" data-id="${loanId}">
+            <div>
+                <h4 class="text-lg font-semibold text-gray-800">${loanData.applicantName}</h4>
+                <p class="text-sm text-gray-500">No. K/P: ${loanData.applicantIC}</p>
+                <p class="text-sm text-gray-500">Memohon pada: ${requestedDate}</p>
+            </div>
+            <p class="text-sm text-gray-600"><span class="font-medium">Tujuan:</span> ${loanData.purpose}</p>
+            <p class="text-sm text-gray-600"><span class="font-medium">Tarikh:</span> ${new Date(loanData.loanDate).toLocaleDateString('ms-MY')} <span class="font-medium">hingga</span> ${new Date(loanData.returnDate).toLocaleDateString('ms-MY')}</p>
+            
+            <div class="pt-2">
+                <h5 class="text-sm font-semibold text-gray-700 mb-1">Aset Dipohon:</h5>
+                <ul class="list-disc list-inside space-y-1 pl-2">
+                    ${loanData.assets.map(asset => `
+                        <li class="text-sm text-gray-600">
+                            ${asset.name} <span class="text-gray-400">(${asset.serialNumber || 'N/A'})</span>
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+            
+            <div class="flex gap-3 pt-2">
+                <button data-action="approve" class="btn-approve flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded text-sm transition duration-150">
+                    Luluskan
+                </button>
+                <button data-action="reject" class="btn-reject flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded text-sm transition duration-150">
+                    Tolak
+                </button>
+            </div>
+        </div>
     `;
 }
 
-// (B) Logik Tindakan Jadual Pinjaman
+function renderHistoryLoanItem(loanId, loanData) {
+    let statusClass, statusText;
+    switch (loanData.status) {
+        case 'Approved':
+            statusClass = 'bg-yellow-100 text-yellow-800';
+            statusText = 'Dipinjam';
+            break;
+        case 'Completed':
+            statusClass = 'bg-green-100 text-green-800';
+            statusText = 'Dipulang';
+            break;
+        case 'Rejected':
+            statusClass = 'bg-red-100 text-red-800';
+            statusText = 'Ditolak';
+            break;
+        default:
+            statusClass = 'bg-gray-100 text-gray-800';
+            statusText = loanData.status;
+    }
+    
+    const approvedDate = loanData.approvedAt?.toDate().toLocaleString('ms-MY');
+    const returnedDate = loanData.returnedAt?.toDate().toLocaleString('ms-MY');
 
-async function handleLoanAction(e) {
+    return `
+        <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm space-y-2" data-id="${loanId}">
+            <div class="flex justify-between items-center">
+                <h4 class="text-lg font-semibold text-gray-800">${loanData.applicantName}</h4>
+                <span class="text-xs font-medium px-2.5 py-0.5 rounded-full ${statusClass}">${statusText}</span>
+            </div>
+            <p class="text-sm text-gray-500">No. K/P: ${loanData.applicantIC}</p>
+            
+            ${approvedDate ? `<p class="text-sm text-gray-500">Diluluskan: ${approvedDate} oleh ${loanData.approvedBy || 'Admin'}</p>` : ''}
+            ${returnedDate ? `<p class="text-sm text-gray-500">Dipulangkan: ${returnedDate}</p>` : ''}
+
+            <div class="pt-2">
+                <h5 class="text-sm font-semibold text-gray-700 mb-1">Aset Terlibat:</h5>
+                <ul class="list-disc list-inside space-y-1 pl-2">
+                    ${loanData.assets.map(asset => `
+                        <li class="text-sm text-gray-600">
+                            ${asset.name} <span class="text-gray-400">(${asset.serialNumber || 'N/A'})</span>
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+            
+            ${loanData.status === 'Approved' ? `
+            <div class="pt-2">
+                <button data-action="return" class="btn-return w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded text-sm transition duration-150">
+                    Tandakan Sebagai Dipulangkan
+                </button>
+            </div>
+            ` : ''}
+        </div>
+    `;
+}
+
+// --- Tindakan (Actions) untuk Pinjaman ---
+
+function handlePendingListClick(e) {
+    const button = e.target.closest('button');
+    if (!button) return;
+    
+    const action = button.dataset.action;
+    const loanId = button.closest('.asset-item-admin, .p-4').dataset.id; // Dapatkan ID dari item induk
+    
+    if (action === 'approve') {
+        handleApproveLoan(loanId, button);
+    } else if (action === 'reject') {
+        handleRejectLoan(loanId, button);
+    }
+}
+
+function handleHistoryListClick(e) {
     const button = e.target.closest('button');
     if (!button) return;
 
-    const row = button.closest('tr');
-    const loanId = row.dataset.id;
+    const action = button.dataset.action;
+    const loanId = button.closest('.asset-item-admin, .p-4').dataset.id;
+
+    if (action === 'return') {
+        handleReturnLoan(loanId, button);
+    }
+}
+
+async function handleApproveLoan(loanId, button) {
     const loan = allLoans.find(l => l.id === loanId)?.data;
     if (!loan) return;
 
-    const assetIds = loan.assets.map(a => a.id);
-
-    // LULUSKAN
-    if (button.classList.contains('approve-btn')) {
-        const confirmed = await showConfirm('Luluskan Pinjaman', `Anda pasti mahu luluskan permohonan untuk:<br><strong>${loan.teacherName}</strong>?`);
-        if (confirmed) {
-            try {
-                const batch = writeBatch(db);
-                // 1. Kemas kini status pinjaman
-                const loanRef = doc(db, 'loans', loanId);
-                batch.update(loanRef, { status: 'Approved' });
-                // 2. Kemas kini status semua aset berkaitan
-                assetIds.forEach(id => {
-                    const assetRef = doc(db, 'assets', id);
-                    batch.update(assetRef, { status: 'Dipinjam' });
-                });
-                await batch.commit();
-                playSound('success');
-            } catch (error) {
-                console.error("Ralat meluluskan: ", error);
-                showMessage('Ralat', `Gagal meluluskan: ${error.message}`);
-            }
-        }
-    }
-    
-    // TOLAK
-    else if (button.classList.contains('reject-btn')) {
-        const confirmed = await showConfirm('Tolak Permohonan', `Anda pasti mahu tolak permohonan untuk:<br><strong>${loan.teacherName}</strong>?`);
-        if (confirmed) {
-            try {
-                const batch = writeBatch(db);
-                // 1. Kemas kini status pinjaman
-                const loanRef = doc(db, 'loans', loanId);
-                batch.update(loanRef, { status: 'Rejected' });
-                // 2. Kembalikan status aset kepada 'Tersedia'
-                assetIds.forEach(id => {
-                    const assetRef = doc(db, 'assets', id);
-                    batch.update(assetRef, { status: 'Tersedia' });
-                });
-                await batch.commit();
-                playSound('error');
-            } catch (error) {
-                console.error("Ralat menolak: ", error);
-                showMessage('Ralat', `Gagal menolak: ${error.message}`);
-            }
-        }
-    }
-    
-    // PULANGKAN
-    else if (button.classList.contains('return-btn')) {
-        const confirmed = await showConfirm('Sahkan Pemulangan', `Sahkan <strong>${loan.teacherName}</strong> telah memulangkan semua aset?`);
-        if (confirmed) {
-            try {
-                const batch = writeBatch(db);
-                // 1. Kemas kini status pinjaman
-                const loanRef = doc(db, 'loans', loanId);
-                batch.update(loanRef, { status: 'Returned' });
-                // 2. Kembalikan status aset kepada 'Tersedia'
-                assetIds.forEach(id => {
-                    const assetRef = doc(db, 'assets', id);
-                    batch.update(assetRef, { status: 'Tersedia' });
-                });
-                await batch.commit();
-                playSound('success');
-            } catch (error) {
-                console.error("Ralat memulangkan: ", error);
-                showMessage('Ralat', `Gagal memulangkan: ${error.message}`);
-            }
-        }
-    }
-    
-    // EDIT
-    else if (button.classList.contains('edit-btn')) {
-        // Buka modal edit
-        document.getElementById('edit-loan-id').value = loanId;
-        document.getElementById('edit-teacherName').value = loan.teacherName;
-        document.getElementById('edit-teacherIC').value = loan.teacherIC;
-        document.getElementById('edit-startDate').value = loan.startDate;
-        document.getElementById('edit-endDate').value = loan.endDate;
-        document.getElementById('edit-purpose').value = loan.purpose;
-        document.getElementById('edit-item-list').innerHTML = loan.assets.map(a => `<li>${a.name}</li>`).join('');
-        editLoanError.textContent = '';
-        editLoanModal.classList.remove('hidden');
-    }
-    
-    // PADAM REKOD (DELETE)
-    else if (button.classList.contains('delete-btn')) {
-        const confirmed = await showConfirm('Padam Rekod', `Anda pasti mahu padam rekod ini secara kekal?<br><strong>${loan.teacherName} (${loan.status})</strong><br><small>Tindakan ini tidak akan memulangkan aset jika ia masih 'Diluluskan'.</small>`);
-        if (confirmed) {
-            try {
-                await deleteDoc(doc(db, 'loans', loanId));
-                playSound('success');
-            } catch (error) {
-                console.error("Ralat memadam: ", error);
-                showMessage('Ralat', `Gagal memadam: ${error.message}`);
-            }
-        }
-    }
-}
-
-// (C) Logik Modal Edit Pinjaman
-
-async function handleSaveLoanEdit(e) {
-    e.preventDefault();
-    const loanId = document.getElementById('edit-loan-id').value;
-    const saveButton = document.getElementById('edit-loan-submit');
-    saveButton.disabled = true;
-    saveButton.textContent = 'Menyimpan...';
-    editLoanError.textContent = '';
-
-    const updatedData = {
-        teacherName: document.getElementById('edit-teacherName').value,
-        teacherIC: document.getElementById('edit-teacherIC').value,
-        startDate: document.getElementById('edit-startDate').value,
-        endDate: document.getElementById('edit-endDate').value,
-        purpose: document.getElementById('edit-purpose').value,
-    };
-
-    try {
-        const loanRef = doc(db, 'loans', loanId);
-        await updateDoc(loanRef, updatedData);
-        editLoanModal.classList.add('hidden');
-        playSound('success');
-    } catch (error) {
-        console.error("Ralat menyimpan editan pinjaman: ", error);
-        editLoanError.textContent = `Ralat: ${error.message}`;
-        playSound('error');
-    } finally {
-        saveButton.disabled = false;
-        saveButton.textContent = 'Simpan Perubahan';
-    }
-}
-
-// (D) Logik Kosongkan Rekod Lama
-
-async function clearOldRecords() {
-    const confirmed = await showConfirm(
-        'Kosongkan Rekod Lama',
-        "Anda pasti mahu memadam semua rekod yang berstatus 'Dipulangkan' atau 'Ditolak' secara kekal?<br><br><strong>Tindakan ini tidak boleh diundur.</strong>"
-    );
-    
+    const confirmed = await showConfirm('Luluskan Pinjaman', `Anda pasti mahu meluluskan pinjaman untuk ${loan.applicantName}?`);
     if (!confirmed) return;
 
-    const recordsToDelete = allLoans.filter(l => l.data.status === 'Returned' || l.data.status === 'Rejected');
+    button.disabled = true;
+    button.textContent = 'Memproses...';
     
-    if (recordsToDelete.length === 0) {
-        showMessage('Tiada Rekod', 'Tiada rekod lama (Dipulangkan/Ditolak) untuk dipadam.');
-        return;
-    }
+    // Ambil ID Aplikasi (disediakan oleh Canvas)
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
     try {
-        const batch = writeBatch(db);
-        recordsToDelete.forEach(loan => {
-            const loanRef = doc(db, 'loans', loan.id);
-            batch.delete(loanRef);
-        });
-        await batch.commit();
-        showMessage('Berjaya', `Berjaya memadam ${recordsToDelete.length} rekod lama.`);
-        playSound('success');
-    } catch (error) {
-        console.error("Ralat memadam rekod lama: ", error);
-        showMessage('Ralat', `Gagal memadam rekod: ${error.message}`);
-        playSound('error');
-    }
-}
-
-// (E) Logik Tambah Aset Pukal
-
-async function handleBulkAdd(e) {
-    e.preventDefault();
-    bulkAddButton.disabled = true;
-    bulkAddButton.textContent = 'Memproses...';
-    bulkAddStatus.textContent = '';
-
-    const baseName = document.getElementById('baseName').value.trim();
-    const groupName = document.getElementById('groupName').value.trim();
-    const quantity = parseInt(document.getElementById('quantity').value, 10);
-    const category = document.getElementById('category').value;
-
-    if (quantity < 1 || quantity > 100) {
-        bulkAddStatus.textContent = 'Ralat: Kuantiti mesti antara 1 dan 100.';
-        bulkAddStatus.className = 'text-sm mt-2 text-red-600';
-        bulkAddButton.disabled = false;
-        bulkAddButton.textContent = 'Tambah Aset';
-        playSound('error');
-        return;
-    }
-    
-    const isGrouped = groupName !== '';
-
-    const confirmed = await showConfirm(
-        'Tambah Aset Pukal',
-        `Anda pasti mahu menambah ${quantity} aset dengan nama asas "${baseName}"?`
-    );
-
-    if (!confirmed) {
-        bulkAddButton.disabled = false;
-        bulkAddButton.textContent = 'Tambah Aset';
-        return;
-    }
-
-    try {
-        const batch = writeBatch(db);
-        for (let i = 1; i <= quantity; i++) {
-            const assetName = `${baseName} ${i}`;
-            const assetRef = doc(collection(db, 'assets')); // Cipta rujukan baru
-            batch.set(assetRef, {
-                name: assetName,
-                category: category,
-                status: 'Tersedia', // 'Tersedia', 'Dipinjam', 'Rosak', 'Dipohon'
-                groupName: groupName,
-                isGroupChild: isGrouped, // Tandakan sebagai sebahagian dari kumpulan
-                createdAt: serverTimestamp(),
-                imageUrl: '',
-                specs: ''
-            });
-        }
-        await batch.commit();
-
-        bulkAddStatus.textContent = `Berjaya! ${quantity} aset telah ditambah.`;
-        bulkAddStatus.className = 'text-sm mt-2 text-green-600';
-        bulkAddForm.reset();
-        playSound('success');
-
-    } catch (error) {
-        console.error("Ralat menambah aset pukal: ", error);
-        bulkAddStatus.textContent = `Ralat: ${error.message}`;
-        bulkAddStatus.className = 'text-sm mt-2 text-red-600';
-        playSound('error');
-    } finally {
-        bulkAddButton.disabled = false;
-        bulkAddButton.textContent = 'Tambah Aset';
-    }
-}
-
-// (F) Logik Pengurus Aset (Asset Manager)
-
-function openAssetManager() {
-    assetManagerList.innerHTML = ''; // Kosongkan
-    
-    // Isih aset (kumpulan dahulu, kemudian mengikut nama)
-    const sortedAssets = [...allAssets].sort((a, b) => {
-        const groupA = a.data.groupName || 'zzzz'; // Letak yang tiada kumpulan di bawah
-        const groupB = b.data.groupName || 'zzzz';
-        const nameA = a.data.name.toLowerCase();
-        const nameB = b.data.name.toLowerCase();
-
-        if (groupA < groupB) return -1;
-        if (groupA > groupB) return 1;
+        // (FIX) Panggil window.firebase secara terus
+        const batch = window.firebase.writeBatch(db);
         
-        // Jika kumpulan sama, isih ikut nama
-        if (nameA < nameB) return -1;
-        if (nameA > nameB) return 1;
-        return 0;
+        // 1. Kemas kini dokumen pinjaman (loan)
+        const loanRef = window.firebase.doc(db, `artifacts/${appId}/public/data/loans`, loanId);
+        batch.update(loanRef, {
+            status: 'Approved',
+            approvedAt: window.firebase.serverTimestamp(),
+            approvedBy: 'Admin' // Nanti boleh tukar ke nama admin jika ada sistem auth penuh
+        });
+
+        // 2. Kemas kini semua aset yang terlibat
+        loan.assets.forEach(asset => {
+            const assetRef = window.firebase.doc(db, `artifacts/${appId}/public/data/assets`, asset.id);
+            batch.update(assetRef, {
+                status: 'On Loan',
+                currentLoanId: loanId // Pastikan ID pinjaman dikaitkan
+            });
+        });
+
+        await batch.commit();
+        showMessage('Pinjaman Diluluskan', 'Pinjaman telah diluluskan dan aset telah dikemas kini.');
+        playSound('success');
+        // UI akan dikemas kini secara automatik oleh onSnapshot
+
+    } catch (error) {
+        console.error("Ralat meluluskan pinjaman:", error);
+        showMessage('Ralat', 'Gagal meluluskan pinjaman.');
+        playSound('error');
+        button.disabled = false;
+        button.textContent = 'Luluskan';
+    }
+}
+
+async function handleRejectLoan(loanId, button) {
+    const loan = allLoans.find(l => l.id === loanId)?.data;
+    if (!loan) return;
+
+    const confirmed = await showConfirm('Tolak Pinjaman', `Anda pasti mahu menolak pinjaman untuk ${loan.applicantName}?`);
+    if (!confirmed) return;
+
+    button.disabled = true;
+    button.closest('div').querySelector('.btn-approve').disabled = true;
+    button.textContent = 'Memproses...';
+    
+    // Ambil ID Aplikasi (disediakan oleh Canvas)
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+    try {
+        // (FIX) Panggil window.firebase secara terus
+        const batch = window.firebase.writeBatch(db);
+        
+        // 1. Kemas kini dokumen pinjaman (loan)
+        const loanRef = window.firebase.doc(db, `artifacts/${appId}/public/data/loans`, loanId);
+        batch.update(loanRef, {
+            status: 'Rejected',
+            approvedAt: window.firebase.serverTimestamp(), // Tandakan masa ditolak
+            approvedBy: 'Admin'
+        });
+
+        // 2. Kemas kini semua aset yang terlibat (kembali ke 'Available')
+        loan.assets.forEach(asset => {
+            const assetRef = window.firebase.doc(db, `artifacts/${appId}/public/data/assets`, asset.id);
+            batch.update(assetRef, {
+                status: 'Available',
+                currentLoanId: null // Padam kaitan ID pinjaman
+            });
+        });
+
+        await batch.commit();
+        showMessage('Pinjaman Ditolak', 'Permohonan pinjaman telah ditolak.');
+        playSound('success');
+        // UI akan dikemas kini secara automatik oleh onSnapshot
+
+    } catch (error) {
+        console.error("Ralat menolak pinjaman:", error);
+        showMessage('Ralat', 'Gagal menolak pinjaman.');
+        playSound('error');
+        button.disabled = false;
+        button.closest('div').querySelector('.btn-approve').disabled = false;
+        button.textContent = 'Tolak';
+    }
+}
+
+async function handleReturnLoan(loanId, button) {
+    const loan = allLoans.find(l => l.id === loanId)?.data;
+    if (!loan) return;
+
+    const confirmed = await showConfirm('Pulangan Aset', `Sahkan bahawa ${loan.applicantName} telah memulangkan semua aset?`);
+    if (!confirmed) return;
+
+    button.disabled = true;
+    button.textContent = 'Memproses...';
+    
+    // Ambil ID Aplikasi (disediakan oleh Canvas)
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+    try {
+        // (FIX) Panggil window.firebase secara terus
+        const batch = window.firebase.writeBatch(db);
+        
+        // 1. Kemas kini dokumen pinjaman (loan)
+        const loanRef = window.firebase.doc(db, `artifacts/${appId}/public/data/loans`, loanId);
+        batch.update(loanRef, {
+            status: 'Completed',
+            returnedAt: window.firebase.serverTimestamp()
+        });
+
+        // 2. Kemas kini semua aset yang terlibat (kembali ke 'Available')
+        loan.assets.forEach(asset => {
+            const assetRef = window.firebase.doc(db, `artifacts/${appId}/public/data/assets`, asset.id);
+            batch.update(assetRef, {
+                status: 'Available',
+                currentLoanId: null // Padam kaitan ID pinjaman
+            });
+        });
+
+        await batch.commit();
+        showMessage('Aset Dipulangkan', 'Aset telah ditandakan sebagai dipulangkan dan kini tersedia.');
+        playSound('success');
+        // UI akan dikemas kini secara automatik oleh onSnapshot
+
+    } catch (error) {
+        console.error("Ralat pulangan aset:", error);
+        showMessage('Ralat', 'Gagal mengemas kini status pulangan.');
+        playSound('error');
+        button.disabled = false;
+        button.textContent = 'Tandakan Sebagai Dipulangkan';
+    }
+}
+
+
+// === PENGURUS ASET (ASSET MANAGER) ===
+
+// Fungsi untuk menerima kemas kini aset dari script.js
+export function updateRekodAssets(assets) {
+    allAssets = assets;
+    // Paparkan aset jika panel aset sedang aktif
+    if (currentAdminView === 'assets') {
+        filterAndDisplayAssets(assetManagerFilter.value);
+    }
+}
+
+// Fungsi untuk menapis dan memaparkan aset dalam panel admin
+function filterAndDisplayAssets(searchTerm) {
+    assetManagerLoading.classList.add('hidden');
+    assetManagerList.innerHTML = '';
+    
+    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+
+    // Tapis berdasarkan carian
+    const filteredAssets = allAssets.filter(asset => {
+        const name = asset.data.name?.toLowerCase() || '';
+        const serial = asset.data.serialNumber?.toLowerCase() || '';
+        const category = asset.data.category?.toLowerCase() || '';
+        const status = asset.data.status?.toLowerCase() || '';
+        
+        return name.includes(lowerCaseSearchTerm) || 
+               serial.includes(lowerCaseSearchTerm) ||
+               category.includes(lowerCaseSearchTerm) ||
+               status.includes(lowerCaseSearchTerm);
     });
 
-    if (sortedAssets.length === 0) {
-        assetManagerList.innerHTML = '<p class="text-gray-500 italic">Tiada aset ditemui.</p>';
-    } else {
-        sortedAssets.forEach(asset => {
-            assetManagerList.innerHTML += renderAssetItem(asset, 'manager', allAssets);
+    if (filteredAssets.length > 0) {
+        // Isihan (sort) sama seperti di senarai utama
+        filteredAssets.sort((a, b) => a.data.name.localeCompare(b.data.name));
+        
+        filteredAssets.forEach(asset => {
+            assetManagerList.innerHTML += renderAssetManagerItem(asset.id, asset.data);
         });
+    } else {
+        if (allAssets.length === 0) {
+            assetManagerList.innerHTML = '<p class="text-gray-500 italic">Tiada aset wujud dalam pangkalan data. Gunakan borang "Tambah Aset Pukal" untuk bermula.</p>';
+        } else {
+            assetManagerList.innerHTML = '<p class="text-gray-500 italic">Tiada aset sepadan dengan carian anda.</p>';
+        }
     }
-    
-    assetManagerModal.classList.remove('hidden');
 }
 
-async function handleAssetManagerAction(e) {
+// Paparan HTML untuk Item Pengurus Aset
+function renderAssetManagerItem(assetId, assetData) {
+    const { name, status, condition, serialNumber, category } = assetData;
+    
+    let statusClass, statusText;
+    switch (status) {
+        case 'Available':
+            statusClass = 'bg-green-100 text-green-800';
+            statusText = 'Tersedia';
+            break;
+        case 'On Loan':
+            statusClass = 'bg-yellow-100 text-yellow-800';
+            statusText = 'Dipinjam';
+            break;
+        case 'Under Maintenance':
+            statusClass = 'bg-red-100 text-red-800';
+            statusText = 'Rosak';
+            break;
+        default:
+            statusClass = 'bg-gray-100 text-gray-800';
+            statusText = status;
+    }
+
+    return `
+        <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm space-y-3" data-id="${assetId}">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h4 class="text-lg font-semibold text-gray-800">${name}</h4>
+                    <p class="text-sm text-gray-500">No. Siri: ${serialNumber || 'N/A'}</p>
+                    <p class="text-sm text-gray-500">Kategori: ${category || 'N/A'}</p>
+                </div>
+                <span class="text-xs font-medium px-2.5 py-0.5 rounded-full ${statusClass} flex-shrink-0">${statusText}</span>
+            </div>
+            
+            <!-- Borang Kemas Kini (Tersorok) -->
+            <form class="update-asset-form hidden space-y-2" data-action="update-form">
+                <input type="text" value="${name}" data-field="name" class="form-input w-full" placeholder="Nama Aset">
+                <input type="text" value="${serialNumber || ''}" data-field="serialNumber" class="form-input w-full" placeholder="No. Siri">
+                <select data-field="category" class="form-input w-full">
+                    <option value="Laptop" ${category === 'Laptop' ? 'selected' : ''}>Laptop</option>
+                    <option value="Tablet" ${category === 'Tablet' ? 'selected' : ''}>Tablet</option>
+                    <option value="Projector" ${category === 'Projector' ? 'selected' : ''}>Projector</option>
+                    <option value="Lain-lain" ${category === 'Lain-lain' ? 'selected' : ''}>Lain-lain</option>
+                </select>
+                <select data-field="condition" class="form-input w-full">
+                    <option value="Baik" ${condition === 'Baik' ? 'selected' : ''}>Baik</option>
+                    <option value="Rosak" ${condition === 'Rosak' ? 'selected' : ''}>Rosak</option>
+                </select>
+                ${status === 'Available' || status === 'Under Maintenance' ? `
+                <select data-field="status" class="form-input w-full">
+                    <option value="Available" ${status === 'Available' ? 'selected' : ''}>Tersedia</option>
+                    <option value="Under Maintenance" ${status === 'Under Maintenance' ? 'selected' : ''}>Dalam Selenggaraan</option>
+                </select>
+                ` : ''}
+                <div class="flex gap-2">
+                    <button type="submit" data-action="save-update" class="btn-save-update flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-1 px-3 rounded text-sm">Simpan</button>
+                    <button type="button" data-action="cancel-update" class="btn-cancel-update flex-1 bg-gray-400 hover:bg-gray-500 text-white font-bold py-1 px-3 rounded text-sm">Batal</button>
+                </div>
+            </form>
+            
+            <!-- Butang Tindakan (Nampak) -->
+            <div class="asset-actions flex gap-3 pt-2" data-action="buttons">
+                <button data-action="edit" class="btn-edit flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded text-sm transition duration-150" ${status === 'On Loan' ? 'disabled' : ''}>
+                    Kemas Kini
+                </button>
+                <button data-action="delete" class="btn-delete flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded text-sm transition duration-150" ${status === 'On Loan' ? 'disabled' : ''}>
+                    Padam
+                </button>
+            </div>
+            ${status === 'On Loan' ? '<p class="text-xs text-center text-red-600 italic mt-2">Aset tidak boleh dikemas kini atau dipadam semasa sedang dipinjam.</p>' : ''}
+        </div>
+    `;
+}
+
+// --- Tindakan (Actions) untuk Aset ---
+
+function handleAssetManagerClick(e) {
+    e.preventDefault(); // Hentikan penghantaran borang jika butang submit diklik
     const button = e.target.closest('button');
     if (!button) return;
 
-    const assetId = button.dataset.assetId;
-    if (!assetId) {
-        // Ini mungkin butang 'Salin ke Kumpulan' dalam modal edit
-        const assetIdFromModal = document.getElementById('edit-asset-id').value;
-        const assetFromModal = allAssets.find(a => a.id === assetIdFromModal);
-        if (button.id === 'copy-to-group-btn' && assetFromModal) {
-            // Logik 'Salin ke Kumpulan' dikendalikan dalam utils.js (melalui event listener)
-            // Cuma pastikan ia tidak dianggap sebagai tindakan lain
-            return; 
-        }
-        return; // Tiada ID aset, abaikan
-    }
+    const action = button.dataset.action;
+    const itemElement = button.closest('.p-4');
+    const assetId = itemElement.dataset.id;
 
-    const asset = allAssets.find(a => a.id === assetId);
+    switch (action) {
+        case 'edit':
+            // Tunjukkan borang kemas kini
+            itemElement.querySelector('.update-asset-form').classList.remove('hidden');
+            itemElement.querySelector('.asset-actions').classList.add('hidden');
+            break;
+        case 'cancel-update':
+            // Sembunyikan borang kemas kini
+            itemElement.querySelector('.update-asset-form').classList.add('hidden');
+            itemElement.querySelector('.asset-actions').classList.remove('hidden');
+            break;
+        case 'save-update':
+            handleUpdateAsset(assetId, itemElement, button);
+            break;
+        case 'delete':
+            handleDeleteAsset(assetId, button);
+            break;
+    }
+}
+
+async function handleUpdateAsset(assetId, itemElement, button) {
+    const form = itemElement.querySelector('.update-asset-form');
+    const asset = allAssets.find(a => a.id === assetId)?.data;
     if (!asset) return;
 
-    // EDIT ASET
-    if (button.classList.contains('edit-asset-btn')) {
-        openEditAssetModal(asset, allAssets);
-    }
-    
-    // PADAM ASET
-    else if (button.classList.contains('delete-asset-btn')) {
-        if (asset.data.status !== 'Tersedia') {
-            showMessage('Ralat', 'Hanya aset yang berstatus "Tersedia" boleh dipadam.');
-            return;
-        }
-        
-        const confirmed = await showConfirm(
-            'Padam Aset',
-            `Anda pasti mahu memadam aset <strong>${asset.data.name}</strong> secara kekal?`
-        );
-        
-        if (confirmed) {
-            try {
-                // Periksa jika aset ini ada dalam mana-mana rekod pinjaman (walaupun lama)
-                const q = query(collection(db, 'loans'), where('assets', 'array-contains', { id: asset.id, name: asset.data.name, category: asset.data.category, groupName: asset.data.groupName || '' }));
-                const querySnapshot = await getDocs(q);
-                
-                if (!querySnapshot.empty) {
-                    // Cara alternatif: Guna 'where' dengan tatasusunan (array)
-                    // Ini mungkin tidak berfungsi jika objek 'asset' dalam tatasusunan 'loans' berbeza
-                    // Pendekatan yang lebih selamat ialah menamakan semula aset kepada "Telah Dipadam"
-                     await showMessage(
-                         'Ralat Memadam',
-                         `Aset <strong>${asset.data.name}</strong> tidak boleh dipadam kerana ia wujud dalam ${querySnapshot.size} rekod pinjaman (lama atau aktif).<br><br>Sila tukar statusnya kepada 'Rosak' atau 'Lupus' jika perlu (fungsi ini belum ditambah).`
-                     );
-                     return;
-                }
+    button.disabled = true;
+    button.textContent = 'Menyimpan...';
 
-                // Jika tiada dalam rekod pinjaman, padam
-                await deleteDoc(doc(db, 'assets', assetId));
-                showMessage('Aset Dipadam', `Aset ${asset.data.name} telah berjaya dipadam.`);
-                playSound('success');
-            } catch (error) {
-                console.error("Ralat memadam aset: ", error);
-                showMessage('Ralat', `Gagal memadam aset: ${error.message}`);
-                playSound('error');
-            }
-        }
-    }
-    
-    // PAKSA PULANG (FORCE RETURN)
-    else if (button.classList.contains('force-return-btn')) {
-        const confirmed = await showConfirm(
-            'Paksa Pulang Aset',
-            `Anda pasti mahu memaksa pulang <strong>${asset.data.name}</strong>?<br><br><small>Ini akan menetapkan status aset kepada 'Tersedia', tetapi tidak akan menukar rekod pinjaman yang berkaitan dengannya.</small>`
-        );
+    // Kumpul data baru dari borang
+    const newData = {};
+    form.querySelectorAll('input, select').forEach(input => {
+        newData[input.dataset.field] = input.value;
+    });
+
+    // Ambil ID Aplikasi (disediakan oleh Canvas)
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+    try {
+        // (FIX) Panggil window.firebase secara terus
+        const assetRef = window.firebase.doc(db, `artifacts/${appId}/public/data/assets`, assetId);
+        await window.firebase.updateDoc(assetRef, newData);
         
-        if (confirmed) {
-            try {
-                const assetRef = doc(db, 'assets', assetId);
-                await updateDoc(assetRef, { status: 'Tersedia' });
-                showMessage('Aset Dipulangkan', `Aset ${asset.data.name} kini ditanda sebagai 'Tersedia'.`);
-                playSound('success');
-            } catch (error) {
-                console.error("Ralat paksa pulang: ", error);
-                showMessage('Ralat', `Gagal: ${error.message}`);
-                playSound('error');
+        showMessage('Aset Dikemas Kini', `Aset "${newData.name}" telah berjaya dikemas kini.`);
+        playSound('success');
+        // UI akan dikemas kini secara automatik oleh onSnapshot
+        // Sembunyikan borang selepas berjaya
+        form.classList.add('hidden');
+        itemElement.querySelector('.asset-actions').classList.remove('hidden');
+
+    } catch (error) {
+        console.error("Ralat mengemas kini aset:", error);
+        showMessage('Ralat', 'Gagal mengemas kini aset.');
+        playSound('error');
+    } finally {
+        button.disabled = false;
+        button.textContent = 'Simpan';
+    }
+}
+
+async function handleDeleteAsset(assetId, button) {
+    const asset = allAssets.find(a => a.id === assetId)?.data;
+    if (!asset || asset.status === 'On Loan') {
+        showMessage('Ralat', 'Aset yang sedang dipinjam tidak boleh dipadam.');
+        playSound('error');
+        return;
+    }
+
+    const confirmed = await showConfirm('Padam Aset', `Anda pasti mahu memadam aset "${asset.name}" (${asset.serialNumber})? Tindakan ini tidak boleh diundur.`);
+    if (!confirmed) return;
+
+    button.disabled = true;
+    button.textContent = 'Memadam...';
+    
+    // Ambil ID Aplikasi (disediakan oleh Canvas)
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+    try {
+        // (FIX) Panggil window.firebase secara terus
+        const assetRef = window.firebase.doc(db, `artifacts/${appId}/public/data/assets`, assetId);
+        await window.firebase.deleteDoc(assetRef);
+        
+        showMessage('Aset Dipadam', `Aset "${asset.name}" telah berjaya dipadam.`);
+        playSound('success');
+        // UI akan dikemas kini secara automatik oleh onSnapshot
+
+    } catch (error) {
+        console.error("Ralat memadam aset:", error);
+        showMessage('Ralat', 'Gagal memadam aset.');
+        playSound('error');
+    }
+    // Tidak perlu 'finally' kerana item akan hilang dari UI
+}
+
+// --- Tambah Aset Pukal ---
+
+async function handleBulkAssetAdd(e) {
+    e.preventDefault();
+    const text = bulkAssetInput.value.trim();
+    if (!text) return;
+
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    if (lines.length === 0) return;
+
+    const confirmed = await showConfirm('Tambah Aset Pukal', `Anda pasti mahu menambah ${lines.length} aset baharu?`);
+    if (!confirmed) return;
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = `Memproses ${lines.length} aset...`;
+
+    // Ambil ID Aplikasi (disediakan oleh Canvas)
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+    // Format: Nama, NoSiri, Kategori, Keadaan
+    // Contoh: 
+    // Laptop Dell 001, DELL001, Laptop, Baik
+    // Projector Epson, EPS001, Projector, Rosak
+    
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+        // (FIX) Panggil window.firebase secara terus
+        const batch = window.firebase.writeBatch(db);
+        const assetsCollectionRef = window.firebase.collection(db, `artifacts/${appId}/public/data/assets`);
+
+        for (const line of lines) {
+            const parts = line.split(',').map(p => p.trim());
+            if (parts.length < 2) { // Sekurang-kurangnya perlu Nama dan NoSiri
+                errorCount++;
+                continue;
             }
+
+            const [name, serialNumber, category, condition] = parts;
+            
+            // Periksa jika No Siri sudah wujud (untuk mengelakkan duplikasi)
+            const q = window.firebase.query(assetsCollectionRef, window.firebase.where("serialNumber", "==", serialNumber));
+            const querySnapshot = await window.firebase.getDocs(q);
+            
+            if (!querySnapshot.empty) {
+                // Sudah wujud, langkau
+                errorCount++;
+                console.warn(`Aset dengan No Siri ${serialNumber} sudah wujud. Dilangkau.`);
+                continue;
+            }
+            
+            // Cipta dokumen baru dalam batch
+            const newAssetRef = window.firebase.doc(assetsCollectionRef); // Auto-generate ID
+            batch.set(newAssetRef, {
+                name: name,
+                serialNumber: serialNumber,
+                category: category || 'Lain-lain',
+                condition: condition || 'Baik',
+                status: (condition === 'Rosak') ? 'Under Maintenance' : 'Available',
+                currentLoanId: null,
+                addedAt: window.firebase.serverTimestamp()
+            });
+            successCount++;
         }
+        
+        // Laksanakan batch
+        if (successCount > 0) {
+            await batch.commit();
+        }
+
+        showMessage('Proses Selesai', `${successCount} aset berjaya ditambah. ${errorCount} aset gagal (mungkin duplikasi atau format salah).`);
+        playSound('success');
+        bulkAssetInput.value = ''; // Kosongkan textarea
+
+    } catch (error) {
+        console.error("Ralat menambah aset pukal:", error);
+        showMessage('Ralat Pukal', 'Berlaku ralat semasa menyimpan aset. Sebahagian mungkin telah disimpan.');
+        playSound('error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Tambah Aset';
     }
 }
 

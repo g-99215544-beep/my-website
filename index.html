@@ -1,651 +1,969 @@
-<!DOCTYPE html>
-<html lang="ms">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Pinjaman ICT - SK Sri Aman</title>
-    <!-- Muat turun Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Muat turun Fon Inter -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Muat turun Tone.js (untuk notifikasi bunyi) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
-    
-    <style>
-        /* Tetapkan fon lalai */
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #F0F9FF; /* bg-blue-50 */
-        }
-        /* Sembunyikan 'number' input spinners */
-        input::-webkit-outer-spin-button,
-        input::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-        input[type=number] {
-            -moz-appearance: textfield;
-        }
-        /* Animasi 'spin' untuk ikon 'loading' */
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-        .animate-spin-slow {
-            animation: spin 2s linear infinite;
-        }
-        /* Sembunyikan 'scrollbar' sambil mengekalkan 'scrolling' */
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .no-scrollbar {
-            -ms-overflow-style: none;  /* IE and Edge */
-            scrollbar-width: none;  /* Firefox */
-        }
-    </style>
-</head>
-<body class="antialiased text-gray-800">
+import React, { useState, useEffect, useMemo } from 'react';
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  onAuthStateChanged, 
+  signOut 
+} from 'firebase/auth';
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  onSnapshot, 
+  query, 
+  orderBy, 
+  doc, 
+  updateDoc, 
+  deleteDoc,
+  serverTimestamp,
+  where,
+  writeBatch,
+  getDocs // Perlu untuk clearOldLoans
+} from 'firebase/firestore';
+import {
+  getStorage,
+  ref,
+  uploadBytesResumable,
+  getDownloadURL,
+  deleteObject // Untuk memadam gambar lama jika perlu
+} from 'firebase/storage';
 
-    <!-- 1. PAPARAN LOADING (SEBELUM FIREBASE SEDIA) -->
-    <div id="loading-view" class="flex items-center justify-center min-h-screen bg-blue-50">
-        <div class="flex flex-col items-center space-y-4">
-            <!-- Ikon SVG 'loading' -->
-            <svg class="animate-spin-slow h-12 w-12 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p class="text-lg font-medium text-blue-700">Menyambung ke pelayan...</p>
+// --- Konfigurasi Firebase ---
+// (Nota: Akaun admin 'gurubesar@sksa.com' & 'guruict@sksa.com' mesti
+// dibuat secara manual di dalam Firebase Authentication Console)
+const firebaseConfig = typeof __firebase_config !== 'undefined' 
+  ? JSON.parse(__firebase_config) 
+  : {
+      apiKey: "AIzaSyCV5skKQO1i-T6pOckTEyhDG8H4fh7vS7s",
+      authDomain: "sistem-pinjaman-aset-ict-v2.firebaseapp.com",
+      projectId: "sistem-pinjaman-aset-ict-v2",
+      storageBucket: "sistem-pinjaman-aset-ict-v2.firebasestorage.app",
+      messagingSenderId: "1013418266777",
+      appId: "1:1013418266777:web:f3ec4d5f38fe7b87b76808",
+      measurementId: "G-9CQDWM207Z"
+    };
+
+// Dapatkan ID Apl
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'sistem-pinjaman-ict';
+
+// --- Inisialisasi Firebase ---
+let app, auth, db, storage;
+try {
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+  storage = getStorage(app); // Inisialisasi Firebase Storage
+} catch (error) {
+  console.error("Ralat Inisialisasi Firebase:", error);
+}
+
+// --- Koleksi Firestore ---
+// DIKEMAS KINI: Laluan (path) ditukar kepada 'asetICT' dan 'loans'
+const getLoansCollection = () => collection(db, `artifacts/${appId}/public/data/loans`);
+const getAssetsCollection = () => collection(db, `artifacts/${appId}/public/data/asetICT`); // Ditukar dari 'items'
+const getLoanDoc = (id) => doc(db, `artifacts/${appId}/public/data/loans/${id}`);
+const getAssetDoc = (id) => doc(db, `artifacts/${appId}/public/data/asetICT/${id}`); // Ditukar dari 'items'
+
+// --- Komponen Bantuan ---
+
+// Komponen Modal
+const Modal = ({ isOpen, onClose, title, children }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 m-4 overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-xl font-medium leading-6 text-gray-900 mb-4">{title}</h3>
+        <div className="text-sm text-gray-600">{children}</div>
+      </div>
+    </div>
+  );
+};
+
+// Komponen Spinner
+const Spinner = () => (
+  <div className="flex justify-center items-center p-10">
+    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+  </div>
+);
+
+// Format Tarikh
+const formatDate = (timestamp) => {
+  if (!timestamp) return 'N/A';
+  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  return date.toLocaleDateString('ms-MY', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+
+// --- Komponen Teras: Mod Guru ---
+
+// Borang Permohonan Pinjaman
+const LoanForm = ({ assets, onSubmitSuccess }) => {
+  const [formData, setFormData] = useState({
+    namaGuru: '',
+    noKP: '',
+    tarikhPinjam: '',
+    tarikhPulang: '',
+    tujuan: '',
+    asetId: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Sediakan senarai aset untuk <select>, hanya yang ada 'jumlah' > 0
+  const availableAssets = useMemo(() => {
+    return assets.filter(a => a.jumlah > 0);
+  }, [assets]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.asetId) {
+      setError("Sila pilih aset ICT.");
+      return;
+    }
+    setLoading(true);
+    setError('');
+
+    try {
+      const selectedAsset = assets.find(a => a.id === formData.asetId);
+      if (!selectedAsset) throw new Error("Aset tidak ditemui.");
+      
+      // Semak jika tarikh pulang sebelum tarikh pinjam
+      if (new Date(formData.tarikhPulang) < new Date(formData.tarikhPinjam)) {
+        setError("Tarikh pulang tidak boleh lebih awal dari tarikh pinjam.");
+        setLoading(false);
+        return;
+      }
+
+      await addDoc(getLoansCollection(), {
+        ...formData,
+        asetNama: selectedAsset.nama, // Simpan nama aset untuk rujukan
+        status: 'Baharu', // Status: Baharu, Diluluskan, Ditolak, Selesai
+        timestamp: serverTimestamp(),
+      });
+      
+      onSubmitSuccess();
+      setFormData({
+        namaGuru: '', noKP: '', tarikhPinjam: '', tarikhPulang: '', tujuan: '', asetId: '',
+      });
+    } catch (err) {
+      console.error("Ralat menghantar permohonan:", err);
+      setError("Permohonan gagal dihantar. Sila cuba lagi.");
+    }
+    setLoading(false);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* ... (Medan Borang Nama, KP, Tarikh, Tujuan dikekalkan seperti asal) ... */}
+      <div>
+        <label htmlFor="namaGuru" className="block text-sm font-medium text-gray-700">Nama Guru</label>
+        <input type="text" name="namaGuru" id="namaGuru" value={formData.namaGuru} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
+      </div>
+      <div>
+        <label htmlFor="noKP" className="block text-sm font-medium text-gray-700">No Kad Pengenalan</label>
+        <input type="text" name="noKP" id="noKP" value={formData.noKP} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="tarikhPinjam" className="block text-sm font-medium text-gray-700">Tarikh Pinjam</label>
+          <input type="date" name="tarikhPinjam" id="tarikhPinjam" value={formData.tarikhPinjam} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
         </div>
-    </div>
-
-    <!-- 2. PAPARAN LOG MASUK (JIKA TIADA PENGGUNA) -->
-    <div id="auth-view" class="hidden min-h-screen bg-gradient-to-br from-blue-100 via-white to-blue-100 flex items-center justify-center p-4">
-        <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
-            <div class="flex flex-col items-center">
-                <!-- Logo Sekolah (Placeholder) -->
-                <div class="bg-blue-600 p-3 rounded-full mb-4">
-                    <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.523 5.754 18 7.5 18s3.332.523 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.523 18.246 18 16.5 18c-1.746 0-3.332.523-4.5 1.253"></path></svg>
-                </div>
-                <h1 class="text-2xl font-bold text-gray-900 mb-1">Sistem Pinjaman ICT</h1>
-                <p class="text-sm text-gray-500 mb-6">SK Sri Aman</p>
-
-                <div class="w-full space-y-4">
-                    <!-- Butang Log Masuk Pentadbir (Google) -->
-                    <button id="google-signin-btn" class="w-full flex items-center justify-center bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-3 px-4 rounded-lg shadow-sm transition duration-200">
-                        <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.92-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path><path fill="none" d="M0 0h48v48H0z"></path></svg>
-                        Log Masuk sebagai Pentadbir (Google)
-                    </button>
-                    
-                    <!-- Butang Log Masuk Guru (Anonymous) -->
-                    <button id="anonymous-signin-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow transition duration-200">
-                        Masuk sebagai Guru (Mod Pinjam)
-                    </button>
-                </div>
-
-                <p class="text-xs text-gray-400 mt-8 text-center">Sila log masuk menggunakan akaun MOE (jika pentadbir) atau sebagai guru untuk meminjam.</p>
-            </div>
+        <div>
+          <label htmlFor="tarikhPulang" className="block text-sm font-medium text-gray-700">Tarikh Pulang</label>
+          <input type="date" name="tarikhPulang" id="tarikhPulang" value={formData.tarikhPulang} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
         </div>
-    </div>
+      </div>
+      <div>
+        <label htmlFor="tujuan" className="block text-sm font-medium text-gray-700">Tujuan Pinjaman</label>
+        <textarea name="tujuan" id="tujuan" rows="3" value={formData.tujuan} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
+      </div>
+      <div>
+        <label htmlFor="asetId" className="block text-sm font-medium text-gray-700">Pilih Aset ICT</label>
+        <select
+          name="asetId"
+          id="asetId"
+          value={formData.asetId}
+          onChange={handleChange}
+          required
+          className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="">-- Sila Pilih Aset --</option>
+          {availableAssets.map(asset => (
+            <option key={asset.id} value={asset.id}>
+              {asset.nama} ({asset.kategori}) - {asset.jumlah} tersedia
+            </option>
+          ))}
+        </select>
+      </div>
+      {error && <p className="text-red-600 text-sm">{error}</p>}
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full px-6 py-3 bg-green-600 text-white rounded-md font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:bg-gray-400"
+      >
+        {loading ? "Menghantar..." : "Hantar Permohonan"}
+      </button>
+    </form>
+  );
+};
 
-    <!-- 3. PAPARAN UTAMA APLIKASI (SELEPAS LOG MASUK) -->
-    <div id="app-view" class="hidden">
-        
-        <!-- Navbar Utama -->
-        <nav class="bg-white shadow-md sticky top-0 z-20">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between h-16">
-                    <!-- Bahagian Kiri: Logo & Tajuk -->
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0 flex items-center">
-                            <div class="bg-blue-600 p-2 rounded-lg">
-                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.523 5.754 18 7.5 18s3.332.523 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.523 18.246 18 16.5 18c-1.746 0-3.332.523-4.5 1.253"></path></svg>
-                            </div>
-                            <span class="ml-3 text-xl font-bold text-gray-900 hidden sm:block">Sistem Pinjaman ICT</span>
-                        </div>
-                    </div>
-                    
-                    <!-- Bahagian Kanan: Info Pengguna & Butang Log Keluar -->
-                    <div class="flex items-center">
-                        <div class="text-right mr-4">
-                            <div id="user-email-display" class="text-sm font-medium text-gray-900 truncate max-w-[200px]" title="Alamat E-mel Pengguna">
-                                memuatkan...
-                            </div>
-                            <div id="user-role-display" class="text-xs font-medium text-blue-600">
-                                memuatkan...
-                            </div>
-                        </div>
-                        <button id="signout-btn" title="Log Keluar" class="p-2 rounded-full text-gray-500 hover:bg-red-100 hover:text-red-600 transition duration-200">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </nav>
-
-        <!-- Konten Utama -->
-        <main class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-            
-            <!-- Bahagian 1: Borang Permohonan Pinjaman (Untuk Semua Pengguna) -->
-            <section id="loan-request-section" class="mb-8">
-                <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                    <h2 class="text-2xl font-bold text-gray-900 mb-5">Borang Permohonan Pinjaman</h2>
-                    
-                    <form id="new-loan-form" class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                        <!-- Kolum 1: Nama & Kelas -->
-                        <div class="space-y-4">
-                            <div>
-                                <label for="new-loan-name" class="block text-sm font-medium text-gray-700 mb-1">Nama Pemohon</label>
-                                <input type="text" id="new-loan-name" required placeholder="Cth: Cikgu Ahmad"
-                                       class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                            </div>
-                            <div>
-                                <label for="new-loan-class" class="block text-sm font-medium text-gray-700 mb-1">Kelas/Tujuan (jika berkenaan)</label>
-                                <input type="text" id="new-loan-class" placeholder="Cth: 6 Bestari / Mesyuarat PIBG"
-                                       class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                            </div>
-                        </div>
-                        
-                        <!-- Kolum 2: Aset & Tujuan -->
-                        <div class="space-y-4">
-                            <div>
-                                <label for="new-loan-asset" class="block text-sm font-medium text-gray-700 mb-1">Aset Hendak Dipinjam</label>
-                                <select id="new-loan-asset" required
-                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                    <option value="" disabled selected>Pilih aset...</option>
-                                    <!-- Pilihan aset akan dimuatkan oleh JavaScript -->
-                                </select>
-                            </div>
-                            <div>
-                                <label for="new-loan-purpose" class="block text-sm font-medium text-gray-700 mb-1">Tujuan Pinjaman</label>
-                                <input type="text" id="new-loan-purpose" required placeholder="Cth: PdPc Matematik di Makmal Komputer"
-                                       class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                            </div>
-                        </div>
-                        
-                        <!-- Kolum 3: Butang Hantar -->
-                        <div class="md:flex md:items-end">
-                            <div class="w-full">
-                                <button type="submit" id="new-loan-submit"
-                                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow transition duration-200 flex items-center justify-center">
-                                    Hantar Permohonan
-                                </button>
-                                <p id="new-loan-status" class="text-sm text-green-600 mt-2 text-center"></p>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </section>
-
-            <!-- Bahagian 2: Senarai Pinjaman (Untuk Semua Pengguna) -->
-            <section id="loan-lists-section" class="mb-8">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    
-                    <!-- Kolum 1: Menunggu Kelulusan -->
-                    <div class="bg-white p-5 rounded-xl shadow-lg border border-gray-200">
-                        <h3 class="text-lg font-bold text-gray-900 mb-4">Menunggu Kelulusan</h3>
-                        <div id="loan-list-pending" class="space-y-3 max-h-80 overflow-y-auto no-scrollbar">
-                            <!-- Kad pinjaman 'pending' akan dimuatkan di sini -->
-                            <p class="text-gray-500 text-sm">Tiada permohonan baharu.</p>
-                        </div>
-                    </div>
-                    
-                    <!-- Kolum 2: Sedang Dipinjam (Diluluskan) -->
-                    <div class="bg-white p-5 rounded-xl shadow-lg border border-gray-200">
-                        <h3 class="text-lg font-bold text-gray-900 mb-4">Sedang Dipinjam</h3>
-                        <div id="loan-list-approved" class="space-y-3 max-h-80 overflow-y-auto no-scrollbar">
-                            <!-- Kad pinjaman 'approved' akan dimuatkan di sini -->
-                            <p class="text-gray-500 text-sm">Tiada aset sedang dipinjam.</p>
-                        </div>
-                    </div>
-                    
-                    <!-- Kolum 3: Sejarah Pinjaman (Dipulang/Ditolak) -->
-                    <div class="bg-white p-5 rounded-xl shadow-lg border border-gray-200">
-                        <h3 class="text-lg font-bold text-gray-900 mb-4">Sejarah & Ditolak</h3>
-                        <div id="loan-list-history" class="space-y-3 max-h-80 overflow-y-auto no-scrollbar">
-                            <!-- Kad pinjaman 'returned'/'rejected' akan dimuatkan di sini -->
-                            <p class="text-gray-500 text-sm">Tiada sejarah pinjaman.</p>
-                        </div>
-                    </div>
-
-                </div>
-            </section>
-
-            <!-- Bahagian 3: Paparan Aset (Untuk Semua Pengguna) -->
-            <section id="asset-display-section" class="mb-8">
-                <h2 class="text-2xl font-bold text-gray-900 mb-5">Aset Tersedia Untuk Pinjaman</h2>
-                <div id="asset-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                    <!-- Kad aset akan dimuatkan di sini -->
-                    <p class="text-gray-500 text-sm col-span-full">Memuatkan senarai aset...</p>
-                </div>
-            </section>
-
-            <!-- Bahagian 4: Kawalan Pentadbir (Hanya Admin) -->
-            <section id="admin-panel-section" class="admin-controls hidden">
-                <h2 class="text-3xl font-extrabold text-gray-900 mb-6 pb-3 border-b-2 border-blue-600">
-                    Panel Kawalan Pentadbir
-                </h2>
-                
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    
-                    <!-- Kolum 1: Tambah Aset Baharu -->
-                    <div class="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                        <h3 class="text-xl font-bold text-gray-900 mb-5">Tambah Aset Baharu</h3>
-                        <form id="add-asset-form" class="space-y-4">
-                            <div>
-                                <label for="add-asset-name" class="block text-sm font-medium text-gray-700">Nama Aset</label>
-                                <input type="text" id="add-asset-name" required placeholder="Cth: Projektor BenQ"
-                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                            </div>
-                            
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label for="add-asset-type" class="block text-sm font-medium text-gray-700">Jenis</label>
-                                    <select id="add-asset-type" required
-                                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                        <option value="Peranti">Peranti</option>
-                                        <option value="Komponen">Komponen</option>
-                                        <option value="Aksesori">Aksesori</option>
-                                        <option value="Lain-lain">Lain-lain</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label for="add-asset-tag" class="block text-sm font-medium text-gray-700">Tag ID</label>
-                                    <input type="text" id="add-asset-tag" placeholder="Cth: SKSA/ICT/P/01"
-                                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                </div>
-                            </div>
-
-                            <div>
-                                <label for="add-asset-status" class="block text-sm font-medium text-gray-700">Status</label>
-                                <select id="add-asset-status" required
-                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                    <option value="Tersedia">Tersedia</option>
-                                    <option value="Dipinjam">Dipinjam</option>
-                                    <option value="Rosak">Rosak</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label for="add-asset-specs" class="block text-sm font-medium text-gray-700">Spesifikasi (Satu per baris)</label>
-                                <textarea id="add-asset-specs" rows="4" placeholder="Cth:&#10;RAM: 8GB&#10;CPU: Intel i5&#10;SSD: 256GB"
-                                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 font-mono text-sm"></textarea>
-                            </div>
-                            
-                            <button type="submit" id="add-asset-submit"
-                                    class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow transition duration-200">
-                                Tambah Aset
-                            </button>
-                            <p id="add-asset-status-msg" class="text-sm text-green-600 text-center"></p>
-                        </form>
-                    </div>
-                    
-                    <!-- Kolum 2: Senarai Aset (Untuk Disunting) -->
-                    <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                        <h3 class="text-xl font-bold text-gray-900 mb-5">Urus Senarai Aset</h3>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Aset</th>
-                                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tag ID</th>
-                                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                        <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Tindakan</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="admin-asset-list" class="bg-white divide-y divide-gray-200">
-                                    <!-- Baris aset akan dimuatkan di sini -->
-                                    <tr><td colspan="4" class="px-4 py-4 text-sm text-gray-500 text-center">Memuatkan senarai aset...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-        </main>
-    </div>
-
-    <!-- Modal Edit Aset (Hanya Admin) -->
-    <div id="edit-asset-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4 z-30 transition-opacity duration-300">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col transition-transform duration-300 scale-95" id="edit-asset-modal-content">
-            
-            <!-- Modal Header -->
-            <div class="flex justify-between items-center p-5 border-b border-gray-200">
-                <h3 class="text-xl font-bold text-gray-900">Kemas Kini Maklumat Aset</h3>
-                <button id="close-edit-modal-btn" class="text-gray-400 hover:text-gray-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                </button>
-            </div>
-            
-            <!-- Modal Body (Boleh Skrol) -->
-            <div class="p-6 overflow-y-auto">
-                <form id="edit-asset-form" class="space-y-4">
-                    <input type="hidden" id="edit-asset-id">
-                    
-                    <div>
-                        <label for="edit-asset-name" class="block text-sm font-medium text-gray-700">Nama Aset</label>
-                        <input type="text" id="edit-asset-name" required
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
-                    </div>
-                    
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label for="edit-asset-type" class="block text-sm font-medium text-gray-700">Jenis</Labe>
-                            <select id="edit-asset-type" required
-                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
-                                <option value="Peranti">Peranti</option>
-                                <option value="Komponen">Komponen</option>
-                                <option value="Aksesori">Aksesori</option>
-                                <option value="Lain-lain">Lain-lain</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="edit-asset-tag" class="block text-sm font-medium text-gray-700">Tag ID</label>
-                            <input type="text" id="edit-asset-tag"
-                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label for="edit-asset-status" class="block text-sm font-medium text-gray-700">Status</label>
-                        <select id="edit-asset-status" required
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
-                            <option value="Tersedia">Tersedia</option>
-                            <option value="Dipinjam">Dipinjam</option>
-                            <option value="Rosak">Rosak</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label for="edit-asset-specs" class="block text-sm font-medium text-gray-700">Spesifikasi (Satu per baris)</label>
-                        <textarea id="edit-asset-specs" rows="4" placeholder="Cth:&#10;RAM: 8GB&#10;CPU: Intel i5&#10;SSD: 256GB"
-                                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100 font-mono text-sm"></textarea>
-                    </div>
-                    
-                    <div class="pt-4 border-t border-gray-200 space-y-3">
-                        <button type="submit" id="edit-asset-submit"
-                                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow transition duration-200">
-                            Simpan Maklumat Aset
-                        </button>
-                        <!-- (BARU) Butang Salin ke Kumpulan -->
-                        <button type="button" id="copy-to-group-btn"
-                                class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg shadow transition duration-200">
-                            Simpan & Salin Info ke Kumpulan
-                        </button>
-                        <p id="edit-asset-status" class="text-sm text-green-600 text-center"></p>
-                    </div>
-                </form>
-            </div>
-            
-            <!-- Modal Footer (Butang Padam) -->
-            <div class="flex justify-start p-5 border-t border-gray-200 bg-gray-50 rounded-b-xl">
-                 <button type="button" id="delete-asset-btn"
-                        class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow transition duration-200">
-                    Padam Aset Ini
-                </button>
-            </div>
+// [BARU] Komponen Kad Aset
+const AssetCard = ({ asset }) => {
+  const placeholderImage = "https://placehold.co/600x400/e2e8f0/64748b?text=Tiada+Gambar";
+  return (
+    <div className="bg-white shadow-lg rounded-lg overflow-hidden transition-shadow duration-300 hover:shadow-xl">
+      <img
+        src={asset.gambarURL || placeholderImage}
+        alt={asset.nama}
+        className="w-full h-48 object-cover"
+        onError={(e) => { e.target.onerror = null; e.target.src = placeholderImage; }}
+      />
+      <div className="p-4">
+        <h4 className="text-lg font-semibold text-gray-800 truncate" title={asset.nama}>
+          💻 {asset.nama}
+        </h4>
+        <p className="text-sm text-gray-500 mb-2">
+          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold">
+            📁 {asset.kategori}
+          </span>
+        </p>
+        <p className="text-sm text-gray-600 mb-3" title={asset.spesifikasi}>
+          <span className="font-medium">Spesifikasi:</span> {asset.spesifikasi ? asset.spesifikasi.substring(0, 50) + '...' : 'N/A'}
+        </p>
+        <div className="flex justify-between items-center">
+          <span className="text-base font-bold text-blue-700">📦 {asset.jumlah} Unit</span>
         </div>
+      </div>
     </div>
+  );
+};
+
+// [DIKEMAS KINI] Paparan Senarai Aset (untuk Guru) - Guna Kad
+const AssetListDisplay = ({ assets, loading }) => {
+  return (
+    <div className="bg-white shadow-lg rounded-lg p-6">
+      <h3 className="text-xl font-semibold text-gray-800 mb-4">Aset ICT Tersedia</h3>
+      {loading ? <Spinner /> : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {assets.length > 0 ? assets.map(asset => (
+            <AssetCard key={asset.id} asset={asset} />
+          )) : (
+            <p className="text-gray-500 col-span-full text-center">Tiada aset tersedia pada masa ini.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Halaman Utama Guru
+const TeacherPage = ({ assets, loadingAssets, onSubmitSuccess }) => {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* Kiri: Borang Permohonan */}
+      <div className="bg-white shadow-lg rounded-lg p-6 lg:p-8">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Borang Permohonan Pinjaman Aset ICT</h2>
+        <LoanForm assets={assets} onSubmitSuccess={onSubmitSuccess} />
+      </div>
+      
+      {/* Kanan: Senarai Aset (Guna Kad) */}
+      <div className="lg:pt-8">
+        <AssetListDisplay assets={assets} loading={loadingAssets} />
+      </div>
+    </div>
+  );
+};
+
+
+// --- Komponen Teras: Mod Admin ---
+
+// Halaman Log Masuk Admin
+const AdminLoginPage = ({ setCurrentView }) => {
+  // ... (Kod dikekalkan seperti asal) ...
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      // Cuba log masuk dengan akaun yang disediakan
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      setError("Log masuk gagal. Sila semak emel dan kata laluan anda.");
+      console.error("Ralat log masuk:", err);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex justify-center items-center pt-10">
+      <div className="w-full max-w-md bg-white shadow-lg rounded-lg p-8">
+        <h2 className="text-2xl font-bold text-center text-gray-900 mb-6">Log Masuk Admin</h2>
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700">Emel</label>
+            <input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
+          </div>
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700">Kata Laluan</label>
+            <input type="password" id="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
+          </div>
+          {error && <p className="text-red-600 text-sm">{error}</p>}
+          <button type="submit" disabled={loading} className="w-full px-6 py-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400">
+            {loading ? "Memproses..." : "Log Masuk"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Komponen Senarai Permohonan (Admin)
+const LoanRequestList = ({ loans, loading, onUpdateStatus, onClearOld }) => {
+  // ... (Kod dikekalkan seperti asal, menggunakan paparan jadual untuk permohonan) ...
+  const filterLoans = (status) => loans.filter(loan => loan.status === status);
+  const newLoans = filterLoans('Baharu');
+  const approvedLoans = filterLoans('Diluluskan');
+  const historyLoans = loans.filter(loan => loan.status === 'Ditolak' || loan.status === 'Selesai');
+
+  const renderLoanRow = (loan) => (
+    <tr key={loan.id} className="hover:bg-gray-50">
+      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+        {loan.namaGuru}
+        <span className="block text-xs text-gray-500">{loan.noKP}</span>
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{loan.asetNama}</td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+        {loan.tarikhPinjam} - {loan.tarikhPulang}
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 max-w-xs truncate" title={loan.tujuan}>{loan.tujuan}</td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{formatDate(loan.timestamp)}</td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium space-x-2">
+        {loan.status === 'Baharu' && (
+          <>
+            <button onClick={() => onUpdateStatus(loan.id, 'Diluluskan')} className="text-green-600 hover:text-green-800">Lulus</button>
+            <button onClick={() => onUpdateStatus(loan.id, 'Ditolak')} className="text-red-600 hover:text-red-800">Tolak</button>
+          </>
+        )}
+        {loan.status === 'Diluluskan' && (
+          <button onClick={() => onUpdateStatus(loan.id, 'Selesai')} className="text-blue-600 hover:text-blue-800">Tanda Selesai</button>
+        )}
+      </td>
+    </tr>
+  );
+
+  const renderHistoryRow = (loan) => (
+    <tr key={loan.id} className="hover:bg-gray-50">
+      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{loan.namaGuru}</td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{loan.asetNama}</td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{formatDate(loan.timestamp)}</td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
+        {loan.status === 'Selesai' && <span className="text-green-700">Selesai</span>}
+        {loan.status === 'Ditolak' && <span className="text-red-700">Ditolak</span>}
+      </td>
+    </tr>
+  );
+
+  return (
+    <div className="space-y-8">
+      {loading && <Spinner />}
+      {/* ... (Jadual untuk Permohonan Baharu, Diluluskan, Rekod dikekalkan seperti asal) ... */}
+      {/* Permohonan Baharu */}
+      <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+        <h3 className="text-lg font-semibold text-gray-800 p-4 bg-gray-50 border-b">Permohonan Baharu</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Guru</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Aset</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Tarikh</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Tujuan</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Dihantar</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Tindakan</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {newLoans.length > 0 ? newLoans.map(renderLoanRow) : (
+                <tr><td colSpan="6" className="text-center p-4 text-gray-500">Tiada permohonan baharu.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Pinjaman Diluluskan (Belum Pulang) */}
+      <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+        <h3 className="text-lg font-semibold text-gray-800 p-4 bg-gray-50 border-b">Pinjaman Diluluskan (Belum Pulang)</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Guru</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Aset</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Tarikh</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Tujuan</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Dihantar</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Tindakan</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {approvedLoans.length > 0 ? approvedLoans.map(renderLoanRow) : (
+                <tr><td colSpan="6" className="text-center p-4 text-gray-500">Tiada pinjaman yang sedang aktif.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Rekod Pinjaman (Selesai / Ditolak) */}
+      <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+        <div className="flex justify-between items-center p-4 bg-gray-50 border-b">
+          <h3 className="text-lg font-semibold text-gray-800">Rekod Pinjaman (Arkib)</h3>
+          <button onClick={onClearOld} className="px-3 py-1 text-sm bg-red-500 text-white rounded-md hover:bg-red-600">
+            Kosongkan Rekod Lama
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Guru</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Aset</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Dihantar</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Status</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {historyLoans.length > 0 ? historyLoans.map(renderHistoryRow) : (
+                <tr><td colSpan="4" className="text-center p-4 text-gray-500">Tiada rekod sejarah.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// [DIKEMAS KINI BESAR] Komponen Pengurusan Aset (Admin) - Guna Kad & Storan
+const AssetManagement = ({ assets, loading, onAddAsset, onUpdateAsset, onDeleteAsset }) => {
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editAsset, setEditAsset] = useState(null); // { id, nama, jumlah, kategori, ... }
+
+  const kategoriOptions = ["Laptop", "Tablet", "Projector", "Lain-lain"];
+  const placeholderImage = "https://placehold.co/600x400/e2e8f0/64748b?text=Tiada+Gambar";
+
+  // Komponen borang dalaman untuk Tambah/Edit
+  const AssetForm = ({ initialData, onSubmit, onCancel, isEditing }) => {
+    const [formData, setFormData] = useState(
+      initialData || { nama: '', jumlah: 1, kategori: 'Laptop', spesifikasi: '', gambarURL: '' }
+    );
+    const [imageFile, setImageFile] = useState(null); // Fail gambar baharu
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [formLoading, setFormLoading] = useState(false);
+
+    const handleChange = (e) => {
+      const { name, value } = e.target;
+      setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleFileChange = (e) => {
+      if (e.target.files[0]) {
+        setImageFile(e.target.files[0]);
+      }
+    };
+
+    const handleSubmit = async (e) => {
+      e.preventDefault();
+      setFormLoading(true);
+      
+      let finalGambarURL = formData.gambarURL; // Kekalkan gambar sedia ada
+
+      if (imageFile) {
+        // Jika ada fail baharu, muat naik
+        try {
+          const storageRef = ref(storage, `aset-images/${appId}/${Date.now()}_${imageFile.name}`);
+          const uploadTask = uploadBytesResumable(storageRef, imageFile);
+
+          await new Promise((resolve, reject) => {
+            uploadTask.on('state_changed',
+              (snapshot) => {
+                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                setUploadProgress(progress);
+              },
+              (error) => {
+                console.error("Upload failed:", error);
+                reject(error);
+              },
+              async () => {
+                finalGambarURL = await getDownloadURL(uploadTask.snapshot.ref);
+                resolve();
+              }
+            );
+          });
+          
+          // TODO: Padam gambar lama dari storage jika edit dan gambar baharu dimuat naik
+          
+        } catch (err) {
+          console.error("Ralat muat naik gambar:", err);
+          setFormLoading(false);
+          return; // Hentikan jika gagal muat naik
+        }
+      }
+
+      // Hantar data ke fungsi 'App'
+      await onSubmit({
+        ...formData,
+        jumlah: parseInt(formData.jumlah, 10),
+        gambarURL: finalGambarURL
+      });
+      
+      setFormLoading(false);
+      onCancel(); // Tutup modal
+    };
+
+    return (
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="nama" className="block text-sm font-medium text-gray-700">Nama Aset</label>
+          <input type="text" id="nama" name="nama" value={formData.nama} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" />
+        </div>
+        <div>
+          <label htmlFor="kategori" className="block text-sm font-medium text-gray-700">Kategori</label>
+          <select id="kategori" name="kategori" value={formData.kategori} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm">
+            {kategoriOptions.map(kat => <option key={kat} value={kat}>{kat}</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="jumlah" className="block text-sm font-medium text-gray-700">Jumlah</label>
+          <input type="number" id="jumlah" name="jumlah" value={formData.jumlah} onChange={handleChange} min="0" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" />
+        </div>
+        <div>
+          <label htmlFor="spesifikasi" className="block text-sm font-medium text-gray-700">Spesifikasi</label>
+          <textarea id="spesifikasi" name="spesifikasi" value={formData.spesifikasi} onChange={handleChange} rows="3" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></textarea>
+        </div>
+        <div>
+          <label htmlFor="gambar" className="block text-sm font-medium text-gray-700">Gambar Aset</label>
+          {formData.gambarURL && !imageFile && (
+            <img src={formData.gambarURL} alt="Preview" className="w-32 h-32 object-cover rounded-md my-2" />
+          )}
+          <input type="file" id="gambar" name="gambar" onChange={handleFileChange} accept="image/png, image/jpeg" className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+        </div>
+        {formLoading && (
+          <div className="w-full bg-gray-200 rounded-full">
+            <div className="bg-blue-600 text-xs font-medium text-blue-100 text-center p-0.5 leading-none rounded-full" style={{ width: `${uploadProgress}%` }}>
+              {uploadProgress > 0 ? `${Math.round(uploadProgress)}%` : "Memuat naik..."}
+            </div>
+          </div>
+        )}
+        <div className="flex justify-end space-x-3 pt-4">
+          <button type="button" onClick={onCancel} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md font-medium hover:bg-gray-300">
+            Batal
+          </button>
+          <button type="submit" disabled={formLoading} className="px-4 py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 disabled:bg-gray-400">
+            {formLoading ? "Menyimpan..." : (isEditing ? "Simpan Perubahan" : "Tambah Aset")}
+          </button>
+        </div>
+      </form>
+    );
+  };
+
+  return (
+    <div className="bg-white shadow-lg rounded-lg">
+      <div className="flex justify-between items-center p-4 bg-gray-50 border-b">
+        <h3 className="text-lg font-semibold text-gray-800">Pengurusan Aset ICT</h3>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="px-4 py-2 bg-green-600 text-white rounded-md font-medium hover:bg-green-700"
+        >
+          Tambah Aset
+        </button>
+      </div>
+
+      {loading && <Spinner />}
+      
+      {/* [DIKEMAS KINI] Paparan Aset Guna Kad */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6">
+        {assets.map(asset => (
+          <div key={asset.id} className="relative">
+            <AssetCard asset={asset} />
+            <div className="flex justify-center space-x-2 mt-2 p-2 bg-gray-50 rounded-b-md">
+              <button onClick={() => setEditAsset(asset)} className="text-sm px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600">Edit</button>
+              <button onClick={() => onDeleteAsset(asset.id, asset.gambarURL)} className="text-sm px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600">Padam</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Modal Tambah Aset */}
+      <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} title="Tambah Aset Baharu">
+        <AssetForm
+          onSubmit={onAddAsset}
+          onCancel={() => setShowAddModal(false)}
+          isEditing={false}
+        />
+      </Modal>
+
+      {/* Modal Edit Aset */}
+      <Modal isOpen={!!editAsset} onClose={() => setEditAsset(null)} title="Edit Aset">
+        {editAsset && (
+          <AssetForm
+            initialData={editAsset}
+            onSubmit={(data) => onUpdateAsset(editAsset.id, data)}
+            onCancel={() => setEditAsset(null)}
+            isEditing={true}
+          />
+        )}
+      </Modal>
+    </div>
+  );
+};
+
+// Komponen Dashboard Admin
+const AdminDashboardPage = ({ assets, loans, loadingAssets, loadingLoans, handlers }) => {
+  // ... (Kod dikekalkan seperti asal) ...
+  const [adminView, setAdminView] = useState('rekodPinjaman'); // rekodPinjaman, urusAset
+
+  return (
+    <div className="space-y-6">
+      {/* Navigasi Admin */}
+      <div className="flex space-x-4 border-b-2 border-gray-200">
+        <button
+          onClick={() => setAdminView('rekodPinjaman')}
+          className={`px-4 py-2 font-medium ${adminView === 'rekodPinjaman' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          Rekod Pinjaman
+        </button>
+        <button
+          onClick={() => setAdminView('urusAset')}
+          className={`px-4 py-2 font-medium ${adminView === 'urusAset' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          Urus Aset
+        </button>
+        <button
+          onClick={handlers.onExportCSV}
+          className="ml-auto px-4 py-2 bg-gray-600 text-white rounded-md font-medium hover:bg-gray-700 text-sm"
+        >
+          Eksport CSV
+        </button>
+      </div>
+
+      {/* Paparan Kandungan Admin */}
+      <div>
+        {adminView === 'rekodPinjaman' && (
+          <LoanRequestList
+            loans={loans}
+            loading={loadingLoans}
+            onUpdateStatus={handlers.onUpdateLoanStatus}
+            onClearOld={handlers.onClearOldLoans}
+          />
+        )}
+        {adminView === 'urusAset' && (
+          <AssetManagement
+            assets={assets}
+            loading={loadingAssets}
+            onAddAsset={handlers.onAddAsset}
+            onUpdateAsset={handlers.onUpdateAsset}
+            onDeleteAsset={handlers.onDeleteAsset}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+
+// --- Komponen Utama: App ---
+function App() {
+  const [user, setUser] = useState(null); // Objek user Firebase
+  const [loadingAuth, setLoadingAuth] = useState(true);
+  const [currentView, setCurrentView] = useState('permohonan'); // permohonan, adminLogin
+  
+  const [assets, setAssets] = useState([]);
+  const [loadingAssets, setLoadingAssets] = useState(true);
+  
+  const [loans, setLoans] = useState([]);
+  const [loadingLoans, setLoadingLoans] = useState(true);
+
+  const [successModalOpen, setSuccessModalOpen] = useState(false);
+  const [error, setError] = useState(null);
+
+  // 1. Kesan Pengesahan (Authentication)
+  useEffect(() => {
+    // ... (Kod dikekalkan seperti asal) ...
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        setCurrentView('adminDashboard');
+      } else if (currentView === 'adminDashboard') {
+        setCurrentView('adminLogin');
+      }
+      setLoadingAuth(false);
+    });
+    return () => unsubscribe();
+  }, [currentView]);
+
+  // 2. Kesan Muat Turun Data (Aset)
+  useEffect(() => {
+    // ... (Kod dikekalkan seperti asal, tetapi kini merujuk 'getAssetsCollection') ...
+    const q = query(getAssetsCollection(), orderBy('nama', 'asc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setAssets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoadingAssets(false);
+    }, (err) => {
+      console.error(err);
+      setError("Gagal memuat turun data aset.");
+      setLoadingAssets(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 3. Kesan Muat Turun Data (Pinjaman)
+  useEffect(() => {
+    // ... (Kod dikekalkan seperti asal) ...
+    if (user) { 
+      setLoadingLoans(true);
+      const q = query(getLoansCollection(), orderBy('timestamp', 'desc'));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        setLoans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setLoadingLoans(false);
+      }, (err) => {
+        console.error(err);
+        setError("Gagal memuat turun data pinjaman.");
+        setLoadingLoans(false);
+      });
+      return () => unsubscribe();
+    } else {
+      setLoans([]); 
+      setLoadingLoans(false);
+    }
+  }, [user]); 
+
+
+  // --- Pengendali Logik (Handlers) ---
+
+  const handleLogout = async () => {
+    // ... (Kod dikekalkan seperti asal) ...
+    await signOut(auth);
+    setCurrentView('permohonan');
+  };
+
+  const handleLoanSubmitSuccess = () => {
+    // ... (Kod dikekalkan seperti asal) ...
+    setSuccessModalOpen(true);
+  };
+
+  // [DIKEMAS KINI] Pengendali untuk Mod Admin
+  const adminHandlers = {
+    // Pengendali Pinjaman
+    onUpdateLoanStatus: async (id, status) => {
+      // ... (Kod dikekalkan seperti asal) ...
+      try {
+        await updateDoc(getLoanDoc(id), { status: status });
+      } catch (err) {
+        console.error("Ralat kemaskini status:", err);
+        setError("Gagal mengemaskini status.");
+      }
+    },
+    onClearOldLoans: async () => {
+      // ... (Kod dikekalkan seperti asal) ...
+      if (!window.confirm("Anda pasti mahu memadam semua rekod yang telah 'Selesai' atau 'Ditolak'? Tindakan ini tidak boleh diundur.")) {
+        return;
+      }
+      try {
+        const q = query(getLoansCollection(), where('status', 'in', ['Selesai', 'Ditolak']));
+        const snapshot = await getDocs(q); // Pastikan getDocs diimport
+        const batch = writeBatch(db);
+        snapshot.docs.forEach(doc => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+      } catch (err) {
+        console.error("Ralat memadam rekod lama:", err);
+        setError("Gagal memadam rekod lama.");
+      }
+    },
     
-    <!-- === PERMULAAN BLOK JAVASCRIPT === -->
-    
-    <script type="module">
-        // Import fungsi Firebase yang diperlukan
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { 
-            getAuth, 
-            signInAnonymously, 
-            onAuthStateChanged, 
-            GoogleAuthProvider, 
-            signInWithPopup, 
-            signOut 
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { 
-            getFirestore, 
-            doc, 
-            getDoc, 
-            addDoc, 
-            setDoc, 
-            updateDoc, 
-            deleteDoc, 
-            onSnapshot, 
-            collection, 
-            query, 
-            where, 
-            writeBatch, 
-            serverTimestamp 
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Konfigurasi Firebase yang anda berikan
-        const firebaseConfig = {
-          apiKey: "AIzaSyCV5skKQO1i-T6pOckTEyhDG8H4fh7vS7s",
-          authDomain: "sistem-pinjaman-aset-ict-v2.firebaseapp.com",
-          projectId: "sistem-pinjaman-aset-ict-v2",
-          storageBucket: "sistem-pinjaman-aset-ict-v2.firebasestorage.app",
-          messagingSenderId: "1013418266777",
-          appId: "1:1013418266777:web:f3ec4d5f38fe7b87b76808",
-          measurementId: "G-9CQDWM207Z"
-        };
-
-        // Inisialisasi Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        // Penyedia Auth
-        const googleProvider = new GoogleAuthProvider();
-
-        // Pembolehubah status global
-        let currentUserId = null;
-        let isAdmin = false;
-
-        // --- PENGENDALI ELEMEN DOM ---
-        // Paparan
-        const loadingView = document.getElementById('loading-view');
-        const authView = document.getElementById('auth-view');
-        const appView = document.getElementById('app-view');
-        
-        // Butang Auth
-        const googleBtn = document.getElementById('google-signin-btn');
-        const anonBtn = document.getElementById('anonymous-signin-btn');
-        const signOutBtn = document.getElementById('signout-btn');
-
-        // Paparan Info Pengguna
-        const userEmailDisplay = document.getElementById('user-email-display');
-        const userRoleDisplay = document.getElementById('user-role-display');
-        const adminControls = document.querySelectorAll('.admin-controls'); // Ini adalah NodeList
-
-        // --- LOGIK PENGESAHAN (AUTH) ---
-
-        // Log masuk dengan Google
-        googleBtn.onclick = () => {
-            signInWithPopup(auth, googleProvider)
-                .catch((error) => {
-                    console.error("Ralat log masuk Google:", error);
-                    alert("Gagal log masuk dengan Google: " + error.message);
-                });
-        };
-
-        // Log masuk secara anonymous
-        anonBtn.onclick = () => {
-            signInAnonymously(auth)
-                .catch((error) => {
-                    console.error("Ralat log masuk anonymous:", error);
-                    alert("Gagal log masuk sebagai guru: " + error.message);
-                });
-        };
-
-        // Log keluar
-        signOutBtn.onclick = () => {
-            signOut(auth).catch((error) => {
-                console.error("Ralat log keluar:", error);
+    // [DIKEMAS KINI] Pengendali Aset (termasuk spesifikasi/gambar)
+    onAddAsset: async (assetData) => {
+      try {
+        await addDoc(getAssetsCollection(), {
+          ...assetData,
+          createdAt: serverTimestamp()
+        });
+      } catch (err) {
+        console.error("Ralat menambah aset:", err);
+        setError("Gagal menambah aset.");
+      }
+    },
+    onUpdateAsset: async (id, assetData) => {
+      try {
+        await updateDoc(getAssetDoc(id), assetData);
+      } catch (err) {
+        console.error("Ralat mengemaskini aset:", err);
+        setError("Gagal mengemaskini aset.");
+      }
+    },
+    onDeleteAsset: async (id, gambarURL) => {
+      if (window.confirm("Anda pasti mahu memadam aset ini?")) {
+        try {
+          // 1. Padam dokumen dari Firestore
+          await deleteDoc(getAssetDoc(id));
+          
+          // 2. Padam gambar dari Storage (jika ada)
+          if (gambarURL) {
+            const imageRef = ref(storage, gambarURL);
+            await deleteObject(imageRef).catch((err) => {
+              // Mungkin gagal jika peraturan storage tidak betul, tapi teruskan
+              console.warn("Gagal memadam gambar lama:", err);
             });
-        };
-
-        // Pendengar status pengesahan (PENGAWAL UTAMA APLIKASI)
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                // Pengguna telah log masuk
-                currentUserId = user.uid;
-                
-                // Semak jika admin (bukan anonymous), berdasarkan peraturan Firebase anda
-                isAdmin = user.providerData.length > 0 && user.providerData[0].providerId !== 'anonymous';
-
-                // Kemas kini UI
-                userEmailDisplay.textContent = user.email || (user.isAnonymous ? 'Pengguna Anonymous' : 'Pengguna');
-                userEmailDisplay.title = user.email || (user.isAnonymous ? 'Pengguna Anonymous' : 'Pengguna');
-                userRoleDisplay.textContent = isAdmin ? 'Pentadbir' : 'Guru (Mod Pinjam)';
-
-                // Tunjukkan/sembunyikan kawalan admin
-                adminControls.forEach(el => {
-                    el.classList.toggle('hidden', !isAdmin);
-                });
-
-                // Tukar paparan
-                appView.classList.remove('hidden');
-                authView.classList.add('hidden');
-                loadingView.classList.add('hidden');
-                
-                // Mula memuatkan data dari Firestore
-                loadAssets();
-                loadLoans();
-
-            } else {
-                // Pengguna telah log keluar
-                currentUserId = null;
-                isAdmin = false;
-
-                // Tukar paparan
-                appView.classList.add('hidden');
-                authView.classList.remove('hidden');
-                loadingView.classList.add('hidden');
-
-                // Kosongkan data lama
-                clearDataLists();
-            }
-        });
-
-        // --- LOGIK FIRESTORE (DATA) ---
-        // (Rangka fungsi - perlu dilengkapkan)
-
-        /**
-         * Memuatkan semua aset dari koleksi 'items'
-         */
-        function loadAssets() {
-            console.log("Memuatkan aset...");
-            const itemsCollection = collection(db, 'items');
-            
-            // TODO: Gunakan onSnapshot untuk mendengar perubahan masa nyata
-            // onSnapshot(itemsCollection, (snapshot) => { ... });
-            
-            // Rangka untuk paparan:
-            // const assetGrid = document.getElementById('asset-grid');
-            // const adminAssetList = document.getElementById('admin-asset-list');
-            // const newLoanAssetSelect = document.getElementById('new-loan-asset');
-            // Kosongkan senarai
-            // assetGrid.innerHTML = '';
-            // adminAssetList.innerHTML = '';
-            // newLoanAssetSelect.innerHTML = '<option value="" disabled selected>Pilih aset...</option>';
-            
-            // snapshot.docs.forEach(doc => {
-            //     const asset = { id: doc.id, ...doc.data() };
-            //     // Tambah pada grid, senarai admin, dan dropdown
-            // });
+          }
+        } catch (err) {
+          console.error("Ralat memadam aset:", err);
+          setError("Gagal memadam aset.");
         }
+      }
+    },
 
-        /**
-         * Memuatkan semua pinjaman dari koleksi 'loans'
-         */
-        function loadLoans() {
-            console.log("Memuatkan pinjaman...");
-            const loansCollection = collection(db, 'loans');
-            
-            // TODO: Gunakan onSnapshot untuk mendengar perubahan masa nyata
-            // onSnapshot(loansCollection, (snapshot) => { ... });
+    // Pengendali Eksport
+    onExportCSV: () => {
+      // ... (Kod dikekalkan seperti asal) ...
+      if (loans.length === 0) {
+        alert("Tiada data untuk dieksport.");
+        return;
+      }
+      let csvContent = "data:text/csv;charset=utf-8,";
+      const headers = ["ID", "Nama Guru", "No KP", "Aset", "Tarikh Pinjam", "Tarikh Pulang", "Tujuan", "Status", "Tarikh Mohon (DD/MM/YYYY)"];
+      csvContent += headers.join(",") + "\r\n";
+      loans.forEach(loan => {
+        const row = [
+          loan.id,
+          `"${loan.namaGuru || ''}"`,
+          `"${(loan.noKP || '').toString()}"`,
+          `"${loan.asetNama || ''}"`,
+          `"${loan.tarikhPinjam || ''}"`,
+          `"${loan.tarikhPulang || ''}"`,
+          `"${(loan.tujuan || '').replace(/"/g, '""')}"`,
+          `"${loan.status || ''}"`,
+          `"${formatDate(loan.timestamp)}"`
+        ];
+        csvContent += row.join(",") + "\r\n";
+      });
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "rekod_pinjaman_ict.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
 
-            // Rangka untuk paparan:
-            // const pendingList = document.getElementById('loan-list-pending');
-            // const approvedList = document.getElementById('loan-list-approved');
-            // const historyList = document.getElementById('loan-list-history');
-            // Kosongkan senarai
-            // pendingList.innerHTML = '';
-            // approvedList.innerHTML = '';
-            // historyList.innerHTML = '';
+  // --- Logik Paparan (Render Logic) ---
 
-            // snapshot.docs.forEach(doc => {
-            //     const loan = { id: doc.id, ...doc.data() };
-            //     // Asingkan ke senarai yang betul berdasarkan loan.status
-            //     if (loan.status === 'Pending') {
-            //         // ...
-            //     } else if (loan.status === 'Approved') {
-            //         // ...
-            //     } else {
-            //         // ...
-            //     }
-            // });
-        }
+  const renderView = () => {
+    // ... (Kod dikekalkan seperti asal) ...
+    if (loadingAuth) {
+      return <Spinner />;
+    }
+    switch (currentView) {
+      case 'permohonan':
+        return <TeacherPage assets={assets} loadingAssets={loadingAssets} onSubmitSuccess={handleLoanSubmitSuccess} />;
+      case 'adminLogin':
+        return <AdminLoginPage setCurrentView={setCurrentView} />;
+      case 'adminDashboard':
+        if (!user) return <AdminLoginPage setCurrentView={setCurrentView} />;
+        return <AdminDashboardPage 
+                  assets={assets}
+                  loans={loans}
+                  loadingAssets={loadingAssets}
+                  loadingLoans={loadingLoans}
+                  handlers={adminHandlers}
+                />;
+      default:
+        return <TeacherPage assets={assets} loadingAssets={loadingAssets} onSubmitSuccess={handleLoanSubmitSuccess} />;
+    }
+  };
+  
+  return (
+    <div className="bg-gray-100 min-h-screen font-sans">
+      {/* Navbar Utama */}
+      <nav className="bg-blue-700 text-white shadow-md">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex-shrink-0 flex items-center">
+              {/* [DIKEMAS KINI] Tajuk projek */}
+              <span className="text-xl font-bold">Sistem Pinjaman Aset ICT (SK Sri Aman)</span>
+            </div>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => setCurrentView('permohonan')}
+                className={`px-3 py-2 rounded-md text-sm font-medium ${currentView === 'permohonan' ? 'bg-blue-800' : 'hover:bg-blue-600'}`}
+              >
+                Permohonan Pinjaman
+              </button>
+              
+              {user ? (
+                <>
+                  <button
+                    onClick={() => setCurrentView('adminDashboard')}
+                    className={`px-3 py-2 rounded-md text-sm font-medium ${currentView === 'adminDashboard' ? 'bg-blue-800' : 'hover:bg-blue-600'}`}
+                  >
+                    Dashboard Admin
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="px-3 py-2 rounded-md text-sm font-medium bg-red-600 hover:bg-red-700"
+                  >
+                    Log Keluar
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setCurrentView('adminLogin')}
+                  className={`px-3 py-2 rounded-md text-sm font-medium ${currentView === 'adminLogin' ? 'bg-blue-800' : 'hover:bg-blue-600'}`}
+                >
+                  Log Masuk Admin
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </nav>
 
-        /**
-         * Mengosongkan semua senarai data (digunakan semasa log keluar)
-         */
-        function clearDataLists() {
-            document.getElementById('asset-grid').innerHTML = '<p class="text-gray-500 text-sm col-span-full">Sila log masuk untuk melihat aset.</p>';
-            document.getElementById('admin-asset-list').innerHTML = '<tr><td colspan="4" class="px-4 py-4 text-sm text-gray-500 text-center">Sila log masuk untuk mengurus aset.</td></tr>';
-            document.getElementById('new-loan-asset').innerHTML = '<option value="" disabled selected>Pilih aset...</option>';
-            document.getElementById('loan-list-pending').innerHTML = '<p class="text-gray-500 text-sm">Tiada permohonan baharu.</p>';
-            document.getElementById('loan-list-approved').innerHTML = '<p class="text-gray-500 text-sm">Tiada aset sedang dipinjam.</p>';
-            document.getElementById('loan-list-history').innerHTML = '<p class="text-gray-500 text-sm">Tiada sejarah pinjaman.</p>';
-        }
+      {/* Kandungan Utama */}
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md mb-4" role="alert">
+            <strong className="font-bold">Ralat:</strong>
+            <span className="block sm:inline"> {error}</span>
+            <button onClick={() => setError(null)} className="float-right font-bold text-lg">&times;</button>
+          </div>
+        )}
+        {renderView()}
+      </main>
 
-        // --- PENGENDALI 'EVENT LISTENER' UNTUK BORANG ---
-        // (Rangka - perlu dilengkapkan)
+      {/* Modal Kejayaan */}
+      <Modal 
+        isOpen={successModalOpen} 
+        onClose={() => setSuccessModalOpen(false)}
+        title="Permohonan Dihantar"
+      >
+        <p>✅ Permohonan anda telah berjaya dihantar. Sila tunggu kelulusan daripada pihak admin.</p>
+      </Modal>
+    </div>
+  );
+}
 
-        document.getElementById('new-loan-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            if (!currentUserId) return; // Mesti log masuk
-            
-            console.log("Menghantar borang pinjaman...");
-            // TODO: Dapatkan nilai dari 'new-loan-name', 'new-loan-class', dll.
-            // TODO: Gunakan addDoc(collection(db, 'loans'), { ... })
-            // Jangan lupa tambah 'status: "Pending"', 'userId: currentUserId'
-        });
+export default App;
 
-        document.getElementById('add-asset-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            if (!isAdmin) return; // Mesti admin
-            
-            console.log("Menghantar borang aset baharu...");
-            // TODO: Dapatkan nilai dari 'add-asset-name', 'add-asset-type', dll.
-            // TODO: Gunakan addDoc(collection(db, 'items'), { ... })
-        });
-        
-        document.getElementById('edit-asset-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            if (!isAdmin) return; // Mesti admin
-            
-            console.log("Menyimpan perubahan aset...");
-            // const assetId = document.getElementById('edit-asset-id').value;
-            // TODO: Dapatkan nilai dari 'edit-asset-name', 'edit-asset-type', dll.
-            // TODO: Gunakan setDoc(doc(db, 'items', assetId), { ... })
-        });
-        
-        document.getElementById('delete-asset-btn').addEventListener('click', () => {
-            if (!isAdmin) return; // Mesti admin
-            
-            // const assetId = document.getElementById('edit-asset-id').value;
-            // if (confirm(`Adakah anda pasti mahu memadam aset ini? (ID: ${assetId})`)) {
-            //     console.log("Memadam aset...");
-            //     // TODO: Gunakan deleteDoc(doc(db, 'items', assetId))
-            // }
-        });
-        
-        document.getElementById('close-edit-modal-btn').addEventListener('click', () => {
-             document.getElementById('edit-asset-modal').classList.add('hidden');
-        });
-
-    </script>
-    
-</body>
-</html>

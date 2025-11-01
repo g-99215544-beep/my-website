@@ -28,549 +28,624 @@
         input[type=number] {
             -moz-appearance: textfield;
         }
-        /* Sembunyikan <details> marker */
-        details > summary {
-            list-style: none;
+        /* Animasi 'spin' untuk ikon 'loading' */
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
-        details > summary::-webkit-details-marker {
+        .animate-spin-slow {
+            animation: spin 2s linear infinite;
+        }
+        /* Sembunyikan 'scrollbar' sambil mengekalkan 'scrolling' */
+        .no-scrollbar::-webkit-scrollbar {
             display: none;
         }
-        /* Gaya untuk Tab Aktif */
-        .tab-button.active {
-            border-color: #2563EB; /* blue-600 */
-            color: #2563EB;
-            background-color: #DBEAFE; /* blue-100 */
-        }
-        /* (BARU) Sembunyikan butiran aset secara lalai & transisi */
-        .asset-details {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease-out;
-            background-color: #FAFAFA; /* Sedikit kelabu */
-        }
-        .asset-item-details.open .asset-details {
-            max-height: 500px; /* Cukup besar untuk gambar & spec */
-            transition: max-height 0.5s ease-in;
-        }
-        /* (BARU) Putar ikon info */
-        .asset-item-details.open .info-icon {
-            transform: rotate(180deg);
-        }
-        /* (BARU) Grid untuk item berkumpulan */
-        .grouped-item-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 0.5rem; /* 8px */
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
         }
     </style>
 </head>
-<body class="leading-normal tracking-normal">
+<body class="antialiased text-gray-800">
 
-    <!-- Header -->
-    <header class="bg-white shadow-md">
-        <div class="container mx-auto px-4 py-6 flex justify-between items-center">
-            <div>
-                <h1 class="text-2xl font-bold text-blue-800">Sistem Pinjaman Aset ICT</h1>
-                <p id="school-name" class="text-lg font-semibold text-gray-700">SK SRI AMAN</p>
-            </div>
-            <div id="auth-container" class="flex items-center space-x-3">
-                <span id="auth-status" class="text-sm text-gray-600 italic">Memuatkan...</span>
-                <button id="login-button" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow transition duration-200">
-                    Log Masuk Admin
-                </button>
-                <button id="logout-button" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg shadow transition duration-200 hidden">
-                    Log Keluar
-                </button>
+    <!-- 1. PAPARAN LOADING (SEBELUM FIREBASE SEDIA) -->
+    <div id="loading-view" class="flex items-center justify-center min-h-screen bg-blue-50">
+        <div class="flex flex-col items-center space-y-4">
+            <!-- Ikon SVG 'loading' -->
+            <svg class="animate-spin-slow h-12 w-12 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-lg font-medium text-blue-700">Menyambung ke pelayan...</p>
+        </div>
+    </div>
+
+    <!-- 2. PAPARAN LOG MASUK (JIKA TIADA PENGGUNA) -->
+    <div id="auth-view" class="hidden min-h-screen bg-gradient-to-br from-blue-100 via-white to-blue-100 flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
+            <div class="flex flex-col items-center">
+                <!-- Logo Sekolah (Placeholder) -->
+                <div class="bg-blue-600 p-3 rounded-full mb-4">
+                    <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.523 5.754 18 7.5 18s3.332.523 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.523 18.246 18 16.5 18c-1.746 0-3.332.523-4.5 1.253"></path></svg>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-900 mb-1">Sistem Pinjaman ICT</h1>
+                <p class="text-sm text-gray-500 mb-6">SK Sri Aman</p>
+
+                <div class="w-full space-y-4">
+                    <!-- Butang Log Masuk Pentadbir (Google) -->
+                    <button id="google-signin-btn" class="w-full flex items-center justify-center bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-3 px-4 rounded-lg shadow-sm transition duration-200">
+                        <svg class="w-5 h-5 mr-3" xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.92-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path><path fill="none" d="M0 0h48v48H0z"></path></svg>
+                        Log Masuk sebagai Pentadbir (Google)
+                    </button>
+                    
+                    <!-- Butang Log Masuk Guru (Anonymous) -->
+                    <button id="anonymous-signin-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow transition duration-200">
+                        Masuk sebagai Guru (Mod Pinjam)
+                    </button>
+                </div>
+
+                <p class="text-xs text-gray-400 mt-8 text-center">Sila log masuk menggunakan akaun MOE (jika pentadbir) atau sebagai guru untuk meminjam.</p>
             </div>
         </div>
-    </header>
+    </div>
 
-    <!-- Konten Utama -->
-    <main class="container mx-auto p-4 mt-6">
-
-        <!-- Navigasi Tab -->
-        <div class="mb-6">
-            <div class="border-b border-gray-200">
-                <nav id="tab-nav" class="-mb-px flex space-x-4" aria-label="Tabs">
-                    <!-- Tab untuk Guru (Default) -->
-                    <button data-tab="permohonan" class="tab-button active whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
-                        Permohonan
-                    </button>
-                    <!-- Tab untuk Semua -->
-                    <button data-tab="aset" class="tab-button whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
-                        Aset Tersedia
-                    </button>
-                    <button data-tab="dipinjam" class="tab-button whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
-                        Aset Dipinjam
-                    </button>
-                    <!-- Tab untuk Admin (Tersembunyi) -->
-                    <button data-tab="rekod" class="tab-button hidden whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
-                        Rekod Pinjaman
-                        <!-- Badge Notifikasi -->
-                        <span id="pending-badge" class="hidden ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full">0</span>
-                    </button>
-                </nav>
+    <!-- 3. PAPARAN UTAMA APLIKASI (SELEPAS LOG MASUK) -->
+    <div id="app-view" class="hidden">
+        
+        <!-- Navbar Utama -->
+        <nav class="bg-white shadow-md sticky top-0 z-20">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <!-- Bahagian Kiri: Logo & Tajuk -->
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 flex items-center">
+                            <div class="bg-blue-600 p-2 rounded-lg">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.523 5.754 18 7.5 18s3.332.523 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.523 18.246 18 16.5 18c-1.746 0-3.332.523-4.5 1.253"></path></svg>
+                            </div>
+                            <span class="ml-3 text-xl font-bold text-gray-900 hidden sm:block">Sistem Pinjaman ICT</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Bahagian Kanan: Info Pengguna & Butang Log Keluar -->
+                    <div class="flex items-center">
+                        <div class="text-right mr-4">
+                            <div id="user-email-display" class="text-sm font-medium text-gray-900 truncate max-w-[200px]" title="Alamat E-mel Pengguna">
+                                memuatkan...
+                            </div>
+                            <div id="user-role-display" class="text-xs font-medium text-blue-600">
+                                memuatkan...
+                            </div>
+                        </div>
+                        <button id="signout-btn" title="Log Keluar" class="p-2 rounded-full text-gray-500 hover:bg-red-100 hover:text-red-600 transition duration-200">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                        </button>
+                    </div>
+                </div>
             </div>
-        </div>
+        </nav>
 
-        <!-- Konten Tab -->
-        <div id="tab-content">
+        <!-- Konten Utama -->
+        <main class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+            
+            <!-- Bahagian 1: Borang Permohonan Pinjaman (Untuk Semua Pengguna) -->
+            <section id="loan-request-section" class="mb-8">
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-5">Borang Permohonan Pinjaman</h2>
+                    
+                    <form id="new-loan-form" class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                        <!-- Kolum 1: Nama & Kelas -->
+                        <div class="space-y-4">
+                            <div>
+                                <label for="new-loan-name" class="block text-sm font-medium text-gray-700 mb-1">Nama Pemohon</label>
+                                <input type="text" id="new-loan-name" required placeholder="Cth: Cikgu Ahmad"
+                                       class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label for="new-loan-class" class="block text-sm font-medium text-gray-700 mb-1">Kelas/Tujuan (jika berkenaan)</label>
+                                <input type="text" id="new-loan-class" placeholder="Cth: 6 Bestari / Mesyuarat PIBG"
+                                       class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            </div>
+                        </div>
+                        
+                        <!-- Kolum 2: Aset & Tujuan -->
+                        <div class="space-y-4">
+                            <div>
+                                <label for="new-loan-asset" class="block text-sm font-medium text-gray-700 mb-1">Aset Hendak Dipinjam</label>
+                                <select id="new-loan-asset" required
+                                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                    <option value="" disabled selected>Pilih aset...</option>
+                                    <!-- Pilihan aset akan dimuatkan oleh JavaScript -->
+                                </select>
+                            </div>
+                            <div>
+                                <label for="new-loan-purpose" class="block text-sm font-medium text-gray-700 mb-1">Tujuan Pinjaman</label>
+                                <input type="text" id="new-loan-purpose" required placeholder="Cth: PdPc Matematik di Makmal Komputer"
+                                       class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            </div>
+                        </div>
+                        
+                        <!-- Kolum 3: Butang Hantar -->
+                        <div class="md:flex md:items-end">
+                            <div class="w-full">
+                                <button type="submit" id="new-loan-submit"
+                                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow transition duration-200 flex items-center justify-center">
+                                    Hantar Permohonan
+                                </button>
+                                <p id="new-loan-status" class="text-sm text-green-600 mt-2 text-center"></p>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </section>
 
-            <!-- Panel 1: Permohonan -->
-            <div id="panel-permohonan" class="tab-panel active">
+            <!-- Bahagian 2: Senarai Pinjaman (Untuk Semua Pengguna) -->
+            <section id="loan-lists-section" class="mb-8">
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <!-- Borang Permohonan -->
-                    <section class="lg:col-span-1 bg-white shadow-md rounded-lg p-6 h-fit">
-                        <h2 class="text-xl font-semibold mb-4 text-blue-600">Borang Permohonan</h2>
-                        <form id="loan-form" class="space-y-4">
+                    
+                    <!-- Kolum 1: Menunggu Kelulusan -->
+                    <div class="bg-white p-5 rounded-xl shadow-lg border border-gray-200">
+                        <h3 class="text-lg font-bold text-gray-900 mb-4">Menunggu Kelulusan</h3>
+                        <div id="loan-list-pending" class="space-y-3 max-h-80 overflow-y-auto no-scrollbar">
+                            <!-- Kad pinjaman 'pending' akan dimuatkan di sini -->
+                            <p class="text-gray-500 text-sm">Tiada permohonan baharu.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Kolum 2: Sedang Dipinjam (Diluluskan) -->
+                    <div class="bg-white p-5 rounded-xl shadow-lg border border-gray-200">
+                        <h3 class="text-lg font-bold text-gray-900 mb-4">Sedang Dipinjam</h3>
+                        <div id="loan-list-approved" class="space-y-3 max-h-80 overflow-y-auto no-scrollbar">
+                            <!-- Kad pinjaman 'approved' akan dimuatkan di sini -->
+                            <p class="text-gray-500 text-sm">Tiada aset sedang dipinjam.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Kolum 3: Sejarah Pinjaman (Dipulang/Ditolak) -->
+                    <div class="bg-white p-5 rounded-xl shadow-lg border border-gray-200">
+                        <h3 class="text-lg font-bold text-gray-900 mb-4">Sejarah & Ditolak</h3>
+                        <div id="loan-list-history" class="space-y-3 max-h-80 overflow-y-auto no-scrollbar">
+                            <!-- Kad pinjaman 'returned'/'rejected' akan dimuatkan di sini -->
+                            <p class="text-gray-500 text-sm">Tiada sejarah pinjaman.</p>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- Bahagian 3: Paparan Aset (Untuk Semua Pengguna) -->
+            <section id="asset-display-section" class="mb-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-5">Aset Tersedia Untuk Pinjaman</h2>
+                <div id="asset-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                    <!-- Kad aset akan dimuatkan di sini -->
+                    <p class="text-gray-500 text-sm col-span-full">Memuatkan senarai aset...</p>
+                </div>
+            </section>
+
+            <!-- Bahagian 4: Kawalan Pentadbir (Hanya Admin) -->
+            <section id="admin-panel-section" class="admin-controls hidden">
+                <h2 class="text-3xl font-extrabold text-gray-900 mb-6 pb-3 border-b-2 border-blue-600">
+                    Panel Kawalan Pentadbir
+                </h2>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    
+                    <!-- Kolum 1: Tambah Aset Baharu -->
+                    <div class="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                        <h3 class="text-xl font-bold text-gray-900 mb-5">Tambah Aset Baharu</h3>
+                        <form id="add-asset-form" class="space-y-4">
                             <div>
-                                <label for="teacherName" class="block text-sm font-medium text-gray-700">Nama Guru</label>
-                                <input type="text" id="teacherName" name="teacherName" required
-                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
+                                <label for="add-asset-name" class="block text-sm font-medium text-gray-700">Nama Aset</label>
+                                <input type="text" id="add-asset-name" required placeholder="Cth: Projektor BenQ"
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
                             </div>
-                            <div>
-                                <label for="teacherIC" class="block text-sm font-medium text-gray-700">No Kad Pengenalan</label>
-                                <input type="text" id="teacherIC" name="teacherIC" placeholder="Cth: 800101-07-5000" required
-                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
-                            </div>
+                            
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label for="startDate" class="block text-sm font-medium text-gray-700">Tarikh Pinjam</albel>
-                                    <input type="date" id="startDate" name="startDate" required
-                                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
+                                    <label for="add-asset-type" class="block text-sm font-medium text-gray-700">Jenis</label>
+                                    <select id="add-asset-type" required
+                                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                        <option value="Peranti">Peranti</option>
+                                        <option value="Komponen">Komponen</option>
+                                        <option value="Aksesori">Aksesori</option>
+                                        <option value="Lain-lain">Lain-lain</option>
+                                    </select>
                                 </div>
                                 <div>
-                                    <label for="endDate" class="block text-sm font-medium text-gray-700">Tarikh Pulang</label>
-                                    <input type="date" id="endDate" name="endDate" required
-                                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
+                                    <label for="add-asset-tag" class="block text-sm font-medium text-gray-700">Tag ID</label>
+                                    <input type="text" id="add-asset-tag" placeholder="Cth: SKSA/ICT/P/01"
+                                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
                                 </div>
                             </div>
+
                             <div>
-                                <label for="purpose" class="block text-sm font-medium text-gray-700">Tujuan Pinjaman</label>
-                                <textarea id="purpose" name="purpose" rows="3" required
-                                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100"></textarea>
+                                <label for="add-asset-status" class="block text-sm font-medium text-gray-700">Status</label>
+                                <select id="add-asset-status" required
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                    <option value="Tersedia">Tersedia</option>
+                                    <option value="Dipinjam">Dipinjam</option>
+                                    <option value="Rosak">Rosak</option>
+                                </select>
                             </div>
-                            <button type="submit" id="submit-button"
-                                    class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow transition duration-200">
-                                Hantar Permohonan
+
+                            <div>
+                                <label for="add-asset-specs" class="block text-sm font-medium text-gray-700">Spesifikasi (Satu per baris)</label>
+                                <textarea id="add-asset-specs" rows="4" placeholder="Cth:&#10;RAM: 8GB&#10;CPU: Intel i5&#10;SSD: 256GB"
+                                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 font-mono text-sm"></textarea>
+                            </div>
+                            
+                            <button type="submit" id="add-asset-submit"
+                                    class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow transition duration-200">
+                                Tambah Aset
                             </button>
-                            <p id="submit-status-error" class="text-sm text-red-600 mt-2"></p>
+                            <p id="add-asset-status-msg" class="text-sm text-green-600 text-center"></p>
                         </form>
-                    </section>
-                    <!-- Senarai Aset (untuk dipilih) -->
-                    <section class="lg:col-span-2 space-y-6">
-                        <div class="bg-white shadow-md rounded-lg p-6">
-                            <h2 class="text-xl font-semibold mb-4 text-green-600">Pilih Item (Boleh Tanda Banyak)</h2>
-                            <div class="space-y-2">
-                                <!-- Kategori Laptop -->
-                                <div class="border border-gray-200 rounded-lg">
-                                    <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg">
-                                        <div class="flex items-center space-x-2">
-                                            <span class="text-lg font-semibold text-gray-800">Laptop</span>
-                                            <span id="form-laptop-count" class="hidden ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-blue-100 bg-blue-600 rounded-full">0</span>
-                                        </div>
-                                    </summary>
-                                    <div id="form-laptop-list" class="space-y-2 p-4">
-                                        <p class="text-gray-500 text-sm italic">Memuatkan...</p>
-                                    </div>
-                                </div>
-                                <!-- Kategori Tablet -->
-                                <div class="border border-gray-200 rounded-lg">
-                                    <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg">
-                                        <div class="flex items-center space-x-2">
-                                            <span class="text-lg font-semibold text-gray-800">Tablet</span>
-                                            <span id="form-tablet-count" class="hidden ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-blue-100 bg-blue-600 rounded-full">0</span>
-                                        </div>
-                                    </summary>
-                                    <div id="form-tablet-list" class="space-y-2 p-4">
-                                        <p class="text-gray-500 text-sm italic">Memuatkan...</p>
-                                    </div>
-                                </div>
-                                <!-- Kategori Projector -->
-                                <div class="border border-gray-200 rounded-lg">
-                                    <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg">
-                                        <div class="flex items-center space-x-2">
-                                            <span class="text-lg font-semibold text-gray-800">Projector</span>
-                                            <span id="form-projector-count" class="hidden ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-blue-100 bg-blue-600 rounded-full">0</span>
-                                        </div>
-                                    </summary>
-                                    <div id="form-projector-list" class="space-y-2 p-4">
-                                        <p class="text-gray-500 text-sm italic">Memuatkan...</p>
-                                    </div>
-                                </div>
-                                <!-- Kategori Lain-lain -->
-                                <div class="border border-gray-200 rounded-lg">
-                                    <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg">
-                                        <div class="flex items-center space-x-2">
-                                            <span class="text-lg font-semibold text-gray-800">Lain-lain</span>
-                                            <span id="form-others-count" class="hidden ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-blue-100 bg-blue-600 rounded-full">0</span>
-                                        </div>
-                                    </summary>
-                                    <div id="form-others-list" class="space-y-2 p-4">
-                                        <p class="text-gray-500 text-sm italic">Memuatkan...</p>
-                                    </div>
-                                </div>
-                            </div>
+                    </div>
+                    
+                    <!-- Kolum 2: Senarai Aset (Untuk Disunting) -->
+                    <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                        <h3 class="text-xl font-bold text-gray-900 mb-5">Urus Senarai Aset</h3>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Aset</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tag ID</th>
+                                        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Tindakan</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-asset-list" class="bg-white divide-y divide-gray-200">
+                                    <!-- Baris aset akan dimuatkan di sini -->
+                                    <tr><td colspan="4" class="px-4 py-4 text-sm text-gray-500 text-center">Memuatkan senarai aset...</td></tr>
+                                </tbody>
+                            </table>
                         </div>
-                    </section>
+                    </div>
                 </div>
-            </div>
+            </section>
 
-            <!-- Panel 2: Aset Tersedia (Paparan Sahaja) -->
-            <div id="panel-aset" class="tab-panel hidden">
-                <section class="space-y-6">
-                    <div class="bg-white shadow-md rounded-lg p-6">
-                        <h2 class="text-xl font-semibold mb-4 text-green-600">Senarai Aset Tersedia (Paparan Sahaja)</h2>
-                        <div class="space-y-2">
-                            <!-- Kategori Laptop -->
-                            <div class="border border-gray-200 rounded-lg">
-                                <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg">
-                                    <div class="flex items-center space-x-2">
-                                        <span class="text-lg font-semibold text-gray-800">Laptop</span>
-                                        <span id="display-laptop-count" class="hidden ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-blue-100 bg-blue-600 rounded-full">0</span>
-                                    </div>
-                                </summary>
-                                <div id="display-laptop-list" class="space-y-2 p-4">
-                                    <p class="text-gray-500 text-sm italic">Memuatkan...</p>
-                                </div>
-                            </div>
-                            <!-- Kategori Tablet -->
-                            <div class="border border-gray-200 rounded-lg">
-                                <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg">
-                                    <div class="flex items-center space-x-2">
-                                        <span class="text-lg font-semibold text-gray-800">Tablet</span>
-                                        <span id="display-tablet-count" class="hidden ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-blue-100 bg-blue-600 rounded-full">0</span>
-                                    </div>
-                                </summary>
-                                <div id="display-tablet-list" class="space-y-2 p-4">
-                                    <p class="text-gray-500 text-sm italic">Memuatkan...</p>
-                                </div>
-                            </div>
-                            <!-- Kategori Projector -->
-                            <div class="border border-gray-200 rounded-lg">
-                                <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg">
-                                    <div class="flex items-center space-x-2">
-                                        <span class="text-lg font-semibold text-gray-800">Projector</span>
-                                        <span id="display-projector-count" class="hidden ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-blue-100 bg-blue-600 rounded-full">0</span>
-                                    </div>
-                                </summary>
-                                <div id="display-projector-list" class="space-y-2 p-4">
-                                    <p class="text-gray-500 text-sm italic">Memuatkan...</p>
-                                </div>
-                            </div>
-                            <!-- Kategori Lain-lain -->
-                            <div class="border border-gray-200 rounded-lg">
-                                <summary class="flex justify-between items-center p-3 bg-gray-100 rounded-t-lg">
-                                    <div class="flex items-center space-x-2">
-                                        <span class="text-lg font-semibold text-gray-800">Lain-lain</span>
-                                        <span id="display-others-count" class="hidden ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-blue-100 bg-blue-600 rounded-full">0</span>
-                                    </div>
-                                </summary>
-                                <div id="display-others-list" class="space-y-2 p-4">
-                                    <p class="text-gray-500 text-sm italic">Memuatkan...</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            </div>
+        </main>
+    </div>
 
-            <!-- Panel 3: Aset Sedang Dipinjam (Public) -->
-            <div id="panel-dipinjam" class="tab-panel hidden">
-                <section class="bg-white shadow-md rounded-lg p-6">
-                    <h2 class="text-xl font-semibold mb-4 text-red-600">Senarai Aset Sedang Dipinjam</h2>
-                    <div id="borrowed-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <p class="text-gray-500 text-sm italic">Memuatkan...</p>
-                    </div>
-                </section>
+    <!-- Modal Edit Aset (Hanya Admin) -->
+    <div id="edit-asset-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4 z-30 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col transition-transform duration-300 scale-95" id="edit-asset-modal-content">
+            
+            <!-- Modal Header -->
+            <div class="flex justify-between items-center p-5 border-b border-gray-200">
+                <h3 class="text-xl font-bold text-gray-900">Kemas Kini Maklumat Aset</h3>
+                <button id="close-edit-modal-btn" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
             </div>
             
-            <!-- Panel 4: Rekod Pinjaman (Admin Sahaja) -->
-            <div id="panel-admin-rekod" class="tab-panel hidden">
-                <!-- Konten Admin Panel akan dipindahkan ke sini oleh JavaScript -->
-            </div>
-
-        </div>
-
-        <!-- Admin Panel (Struktur Asal, tersembunyi) -->
-        <!-- Ia akan dipindahkan ke #panel-admin-rekod oleh JS jika admin log masuk -->
-        <section id="admin-panel" class="lg:col-span-3 bg-white shadow-md rounded-lg p-6 hidden">
-            
-            <!-- Bahagian Pengurusan Aset -->
-            <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                
-                <!-- Borang Tambah Aset Pukal (Accordion) -->
-                <details class="border border-gray-200 rounded-lg bg-white">
-                    <summary class="flex justify-between items-center p-4 cursor-pointer bg-gray-50 hover:bg-gray-100 rounded-t-lg">
-                        <h3 class="text-lg font-semibold text-gray-800">Tambah Aset Pukal</h3>
-                        <svg class="w-6 h-6 text-gray-600 transition-transform duration-200 transform group-open:rotate-90" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    </summary>
-                    <form id="bulk-add-form" class="p-4 space-y-3">
+            <!-- Modal Body (Boleh Skrol) -->
+            <div class="p-6 overflow-y-auto">
+                <form id="edit-asset-form" class="space-y-4">
+                    <input type="hidden" id="edit-asset-id">
+                    
+                    <div>
+                        <label for="edit-asset-name" class="block text-sm font-medium text-gray-700">Nama Aset</label>
+                        <input type="text" id="edit-asset-name" required
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label for="baseName" class="block text-sm font-medium text-gray-700">Nama Asas</label>
-                            <input type="text" id="baseName" placeholder="Cth: Tablet Makmal" required
-                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
-                        </div>
-                        <div>
-                            <label for="groupName" class="block text-sm font-medium text-gray-700">Nama Kumpulan (Pilihan)</label>
-                            <input type="text" id="groupName" placeholder="Cth: Joi Classmate (Untuk kumpul item)"
-                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
-                        </div>
-                        <div>
-                            <label for="quantity" class="block text-sm font-medium text-gray-700">Jumlah</label>
-                            <input type="number" id="quantity" min="1" max="100" placeholder="Cth: 34" required
-                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
-                        </div>
-                        <div>
-                            <label for="category" class="block text-sm font-medium text-gray-700">Kategori</label>
-                            <select id="category" required
+                            <label for="edit-asset-type" class="block text-sm font-medium text-gray-700">Jenis</Labe>
+                            <select id="edit-asset-type" required
                                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
-                                <option value="">Pilih Kategori</option>
-                                <option value="Laptop">Laptop</option>
-                                <option value="Tablet">Tablet</option>
-                                <option value="Projector">Projector</option>
-                                <option value="Lain">Lain-lain</option>
+                                <option value="Peranti">Peranti</option>
+                                <option value="Komponen">Komponen</option>
+                                <option value="Aksesori">Aksesori</option>
+                                <option value="Lain-lain">Lain-lain</option>
                             </select>
                         </div>
-                        <button type="submit" id="bulk-add-button"
-                                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow transition duration-200">
-                            Tambah Aset
-                        </button>
-                        <p id="bulk-add-status" class="text-sm mt-2"></p>
-                    </form>
-                </details>
-                
-                <!-- Butang Pengurus Aset -->
-                <details class="border border-gray-200 rounded-lg bg-white">
-                    <summary class="flex justify-between items-center p-4 cursor-pointer bg-gray-50 hover:bg-gray-100 rounded-t-lg">
-                        <h3 class="text-lg font-semibold text-gray-800">Urus Aset Sedia Ada</h3>
-                        <svg class="w-6 h-6 text-gray-600 transition-transform duration-200 transform group-open:rotate-90" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.08l.738-.46c.477-.298 1.043-.182 1.39.288l.548.74c.346.47.32.1.05.1l-.738.46c-.35.22-.564.606-.564 1.03v1.093c0 .424.214.81.564 1.03l.738.46c.47.29.527.92.18 1.39l-.548.74c-.347.47-.913.587-1.39.288l-.738-.46c-.35-.22-.806-.242-1.205-.08-.396.164-.71.506-.78.93l-.149.894c-.09.542-.56.94-1.11.94h-1.093c-.55 0-1.02-.398-1.11-.94l-.149-.894c-.07-.424-.384-.764-.78-.93-.398-.164-.855-.142-1.205.08l-.738.46c-.477.298-1.043.182-1.39-.288l-.548-.74c-.346-.47-.32-1.042.05-1.39l.738-.46c.35-.22.564-.606.564-1.03V9.093c0-.424-.214-.81-.564-1.03l-.738-.46c-.47-.29-.527-.92-.18-1.39l.548-.74c.347-.47.913.587 1.39.288l.738.46c.35.22.806.242 1.205.08.396.164.71.506.78.93l.149.894z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                    </summary>
-                    <div class="p-4">
-                        <p class="text-sm text-gray-600 mb-3">Edit nama, kategori, URL gambar, atau spesifikasi untuk aset sedia ada.</p>
-                        <button id="open-asset-manager-btn"
-                                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow transition duration-200">
-                            Buka Pengurus Aset
-                        </button>
+                        <div>
+                            <label for="edit-asset-tag" class="block text-sm font-medium text-gray-700">Tag ID</label>
+                            <input type="text" id="edit-asset-tag"
+                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
+                        </div>
                     </div>
-                </details>
+
+                    <div>
+                        <label for="edit-asset-status" class="block text-sm font-medium text-gray-700">Status</label>
+                        <select id="edit-asset-status" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
+                            <option value="Tersedia">Tersedia</option>
+                            <option value="Dipinjam">Dipinjam</option>
+                            <option value="Rosak">Rosak</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="edit-asset-specs" class="block text-sm font-medium text-gray-700">Spesifikasi (Satu per baris)</label>
+                        <textarea id="edit-asset-specs" rows="4" placeholder="Cth:&#10;RAM: 8GB&#10;CPU: Intel i5&#10;SSD: 256GB"
+                                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100 font-mono text-sm"></textarea>
+                    </div>
+                    
+                    <div class="pt-4 border-t border-gray-200 space-y-3">
+                        <button type="submit" id="edit-asset-submit"
+                                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow transition duration-200">
+                            Simpan Maklumat Aset
+                        </button>
+                        <!-- (BARU) Butang Salin ke Kumpulan -->
+                        <button type="button" id="copy-to-group-btn"
+                                class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg shadow transition duration-200">
+                            Simpan & Salin Info ke Kumpulan
+                        </button>
+                        <p id="edit-asset-status" class="text-sm text-green-600 text-center"></p>
+                    </div>
+                </form>
             </div>
             
-            <!-- Jadual Rekod Pinjaman -->
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-semibold text-purple-600 flex items-center">
-                    Rekod Permohonan dan Pinjaman
-                    <!-- Badge Notifikasi (Disalin dari Tab) -->
-                    <span id="pending-badge-main" class="hidden ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full">0</span>
-                </h2>
-                <button id="clear-records-btn" class="bg-gray-500 hover:bg-gray-600 text-white text-sm font-semibold py-1 px-3 rounded-lg shadow transition duration-200">
-                    Kosongkan Rekod Lama (Selesai/Ditolak)
-                </button>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tindakan</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Guru</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No. K/P</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aset Dipohon</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tarikh Pinjam</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tarikh Pulang</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tujuan</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="loans-list" class="bg-white divide-y divide-gray-200">
-                        <tr>
-                            <td colspan="8" class="px-6 py-4 text-center text-gray-500 italic">Memuatkan rekod pinjaman...</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
-    </main>
-
-    <!-- Modal Log Masuk -->
-    <div id="login-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full hidden z-50 flex items-center justify-center p-4">
-        <div class="mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-medium text-gray-900">Log Masuk Admin</h3>
-                <button id="close-login-modal" class="text-gray-400 hover:text-gray-600 text-3xl">&times;</button>
-            </div>
-            <form id="login-form" class="space-y-4">
-                <div>
-                    <label for="email" class="block text-sm font-medium text-gray-700">E-mel</label>
-                    <input type="email" id="email" name="email" required
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
-                </div>
-                <div>
-                    <label for="password" class="block text-sm font-medium text-gray-700">Kata Laluan</label>
-                    <input type="password" id="password" name="password" required
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
-                </div>
-                <button type="submit" id="login-submit"
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow transition duration-200">
-                    Log Masuk
-                </button>
-                <p id="login-error" class="text-sm text-red-600 mt-2"></p>
-            </form>
-        </div>
-    </div>
-    
-    <!-- Modal Pengesahan (Confirm) -->
-    <div id="confirm-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full hidden z-50 flex items-center justify-center p-4">
-        <div class="mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white">
-            <h3 class="text-lg font-medium text-gray-900" id="confirm-title">Pengesahan</h3>
-            <p class="text-sm text-gray-600 my-4" id="confirm-message">Anda pasti?</p>
-            <div class="flex justify-end space-x-2">
-                <button id="confirm-cancel" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-lg">
-                    Batal
-                </button>
-                <button id="confirm-ok" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg">
-                    Sahkan
+            <!-- Modal Footer (Butang Padam) -->
+            <div class="flex justify-start p-5 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+                 <button type="button" id="delete-asset-btn"
+                        class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow transition duration-200">
+                    Padam Aset Ini
                 </button>
             </div>
         </div>
     </div>
     
-    <!-- Modal Mesej (Alert) -->
-    <div id="message-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 h-full w-full hidden z-50 flex items-center justify-center p-4">
-        <div class="mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
-            <h3 class="text-lg font-medium text-gray-900" id="message-title">Mesej Sistem</h3>
-            <div class="text-sm text-gray-600 my-4" id="message-text"></div>
-            <div class="flex justify-end">
-                <button id="message-ok" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg">
-                    OK
-                </button>
-            </div>
-        </div>
-    </div>
+    <!-- === PERMULAAN BLOK JAVASCRIPT === -->
     
-    <!-- Modal Edit Pinjaman -->
-    <div id="edit-loan-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 p-4">
-        <div class="relative mx-auto my-8 p-5 border w-full max-w-lg shadow-lg rounded-md bg-white">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-medium text-gray-900">Edit Permohonan Pinjaman</h3>
-                <button id="close-edit-modal" class="text-gray-400 hover:text-gray-600 text-3xl">&times;</button>
-            </div>
-            <form id="edit-loan-form" class="space-y-4">
-                <input type="hidden" id="edit-loan-id">
-                <div>
-                    <label for="edit-teacherName" class="block text-sm font-medium text-gray-700">Nama Guru</label>
-                    <input type="text" id="edit-teacherName" name="edit-teacherName" required
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
-                </div>
-                <div>
-                    <label for="edit-teacherIC" class="block text-sm font-medium text-gray-700">No Kad Pengenalan</label>
-                    <input type="text" id="edit-teacherIC" name="edit-teacherIC" required
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label for="edit-startDate" class="block text-sm font-medium text-gray-700">Tarikh Pinjam</label>
-                        <input type="date" id="edit-startDate" name="edit-startDate" required
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
-                    </div>
-                    <div>
-                        <label for="edit-endDate" class="block text-sm font-medium text-gray-700">Tarikh Pulang</label>
-                        <input type="date" id="edit-endDate" name="edit-endDate" required
-                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
-                    </div>
-                </div>
-                <div>
-                    <label for="edit-purpose" class="block text-sm font-medium text-gray-700">Tujuan Pinjaman</label>
-                    <textarea id="edit-purpose" name="edit-purpose" rows="3" required
-                              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100"></textarea>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Aset (Tidak boleh diedit)</label>
-                    <div id="edit-item-list" class="mt-1 p-3 bg-gray-100 rounded-md border border-gray-200 text-sm text-gray-600">
-                        <!-- Senarai item akan diisi oleh JavaScript -->
-                    </div>
-                </div>
-                <button type="submit" id="edit-loan-submit"
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow transition duration-200">
-                    Simpan Perubahan
-                </button>
-                <p id="edit-loan-error" class="text-sm text-red-600 mt-2"></p>
-            </form>
-        </div>
-    </div>
+    <script type="module">
+        // Import fungsi Firebase yang diperlukan
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInAnonymously, 
+            onAuthStateChanged, 
+            GoogleAuthProvider, 
+            signInWithPopup, 
+            signOut 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            getDoc, 
+            addDoc, 
+            setDoc, 
+            updateDoc, 
+            deleteDoc, 
+            onSnapshot, 
+            collection, 
+            query, 
+            where, 
+            writeBatch, 
+            serverTimestamp 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    <!-- (BARU) Modal Pengurus Aset -->
-    <div id="asset-manager-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50 p-4">
-        <div class="relative mx-auto my-8 p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-medium text-gray-900">Pengurus Aset (Asset Manager)</h3>
-                <button id="close-asset-manager-btn" class="text-gray-400 hover:text-gray-600 text-3xl">&times;</button>
-            </div>
-            <div id="asset-manager-list" class="h-96 overflow-y-auto space-y-2">
-                <p class="text-gray-500 italic">Memuatkan senarai aset...</p>
-                <!-- Senarai aset akan diisi oleh JavaScript -->
-            </div>
-        </div>
-    </div>
+        // Konfigurasi Firebase yang anda berikan
+        const firebaseConfig = {
+          apiKey: "AIzaSyCV5skKQO1i-T6pOckTEyhDG8H4fh7vS7s",
+          authDomain: "sistem-pinjaman-aset-ict-v2.firebaseapp.com",
+          projectId: "sistem-pinjaman-aset-ict-v2",
+          storageBucket: "sistem-pinjaman-aset-ict-v2.firebasestorage.app",
+          messagingSenderId: "1013418266777",
+          appId: "1:1013418266777:web:f3ec4d5f38fe7b87b76808",
+          measurementId: "G-9CQDWM207Z"
+        };
 
-    <!-- (BARU) Modal Edit Aset -->
-    <div id="edit-asset-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full hidden z-[60] flex items-center justify-center p-4">
-        <div class="mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-medium text-gray-900">Edit Aset</h3>
-                <button id="close-edit-asset-btn" class="text-gray-400 hover:text-gray-600 text-3xl">&times;</button>
-            </div>
-            <form id="edit-asset-form" class="space-y-4">
-                <input type="hidden" id="edit-asset-id">
-                <div>
-                    <label for="edit-asset-name" class="block text-sm font-medium text-gray-700">Nama Aset</label>
-                    <input type="text" id="edit-asset-name" required
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
-                </div>
-                <div>
-                    <label for="edit-asset-group" class="block text-sm font-medium text-gray-700">Nama Kumpulan (Pilihan)</label>
-                    <input type="text" id="edit-asset-group" placeholder="Cth: Joi Classmate"
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
-                </div>
-                <div>
-                    <label for="edit-asset-category" class="block text-sm font-medium text-gray-700">Kategori</label>
-                    <select id="edit-asset-category" required
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
-                        <option value="Laptop">Laptop</option>
-                        <option value="Tablet">Tablet</option>
-                        <option value="Projector">Projector</option>
-                        <option value="Lain">Lain-lain</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="edit-asset-image" class="block text-sm font-medium text-gray-700">URL Gambar</label>
-                    <input type="url" id="edit-asset-image" placeholder="Cth: https://i.imgur.com/gambar.png"
-                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100">
-                    <p class="text-xs text-gray-500 mt-1">Dapatkan pautan 'Direct Link' (berakhir .png/.jpg) dari Imgur/Postimages.</p>
-                </div>
-                <div>
-                    <label for="edit-asset-specs" class="block text-sm font-medium text-gray-700">Spesifikasi (Satu per baris)</label>
-                    <textarea id="edit-asset-specs" rows="4" placeholder="Cth:&#10;RAM: 8GB&#10;CPU: Intel i5&#10;SSD: 256GB"
-                              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-100 font-mono text-sm"></textarea>
-                </div>
+        // Inisialisasi Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Penyedia Auth
+        const googleProvider = new GoogleAuthProvider();
+
+        // Pembolehubah status global
+        let currentUserId = null;
+        let isAdmin = false;
+
+        // --- PENGENDALI ELEMEN DOM ---
+        // Paparan
+        const loadingView = document.getElementById('loading-view');
+        const authView = document.getElementById('auth-view');
+        const appView = document.getElementById('app-view');
+        
+        // Butang Auth
+        const googleBtn = document.getElementById('google-signin-btn');
+        const anonBtn = document.getElementById('anonymous-signin-btn');
+        const signOutBtn = document.getElementById('signout-btn');
+
+        // Paparan Info Pengguna
+        const userEmailDisplay = document.getElementById('user-email-display');
+        const userRoleDisplay = document.getElementById('user-role-display');
+        const adminControls = document.querySelectorAll('.admin-controls'); // Ini adalah NodeList
+
+        // --- LOGIK PENGESAHAN (AUTH) ---
+
+        // Log masuk dengan Google
+        googleBtn.onclick = () => {
+            signInWithPopup(auth, googleProvider)
+                .catch((error) => {
+                    console.error("Ralat log masuk Google:", error);
+                    alert("Gagal log masuk dengan Google: " + error.message);
+                });
+        };
+
+        // Log masuk secara anonymous
+        anonBtn.onclick = () => {
+            signInAnonymously(auth)
+                .catch((error) => {
+                    console.error("Ralat log masuk anonymous:", error);
+                    alert("Gagal log masuk sebagai guru: " + error.message);
+                });
+        };
+
+        // Log keluar
+        signOutBtn.onclick = () => {
+            signOut(auth).catch((error) => {
+                console.error("Ralat log keluar:", error);
+            });
+        };
+
+        // Pendengar status pengesahan (PENGAWAL UTAMA APLIKASI)
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // Pengguna telah log masuk
+                currentUserId = user.uid;
                 
-                <div class="pt-4 border-t border-gray-200 space-y-3">
-                    <button type="submit" id="edit-asset-submit"
-                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow transition duration-200">
-                        Simpan Maklumat Aset
-                    </button>
-                    <!-- (BARU) Butang Salin ke Kumpulan -->
-                    <button type="button" id="copy-to-group-btn"
-                            class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg shadow transition duration-200">
-                        Simpan & Salin Info ke Kumpulan
-                    </button>
-                    <p id="edit-asset-status" class="text-sm mt-2 text-center"></p>
-                </div>
-            </form>
-        </div>
-    </div>
+                // Semak jika admin (bukan anonymous), berdasarkan peraturan Firebase anda
+                isAdmin = user.providerData.length > 0 && user.providerData[0].providerId !== 'anonymous';
 
-    <!-- PENTING: Pautan ke fail JavaScript baharu -->
-    <script type="module" src="script.js" defer></script>
+                // Kemas kini UI
+                userEmailDisplay.textContent = user.email || (user.isAnonymous ? 'Pengguna Anonymous' : 'Pengguna');
+                userEmailDisplay.title = user.email || (user.isAnonymous ? 'Pengguna Anonymous' : 'Pengguna');
+                userRoleDisplay.textContent = isAdmin ? 'Pentadbir' : 'Guru (Mod Pinjam)';
+
+                // Tunjukkan/sembunyikan kawalan admin
+                adminControls.forEach(el => {
+                    el.classList.toggle('hidden', !isAdmin);
+                });
+
+                // Tukar paparan
+                appView.classList.remove('hidden');
+                authView.classList.add('hidden');
+                loadingView.classList.add('hidden');
+                
+                // Mula memuatkan data dari Firestore
+                loadAssets();
+                loadLoans();
+
+            } else {
+                // Pengguna telah log keluar
+                currentUserId = null;
+                isAdmin = false;
+
+                // Tukar paparan
+                appView.classList.add('hidden');
+                authView.classList.remove('hidden');
+                loadingView.classList.add('hidden');
+
+                // Kosongkan data lama
+                clearDataLists();
+            }
+        });
+
+        // --- LOGIK FIRESTORE (DATA) ---
+        // (Rangka fungsi - perlu dilengkapkan)
+
+        /**
+         * Memuatkan semua aset dari koleksi 'items'
+         */
+        function loadAssets() {
+            console.log("Memuatkan aset...");
+            const itemsCollection = collection(db, 'items');
+            
+            // TODO: Gunakan onSnapshot untuk mendengar perubahan masa nyata
+            // onSnapshot(itemsCollection, (snapshot) => { ... });
+            
+            // Rangka untuk paparan:
+            // const assetGrid = document.getElementById('asset-grid');
+            // const adminAssetList = document.getElementById('admin-asset-list');
+            // const newLoanAssetSelect = document.getElementById('new-loan-asset');
+            // Kosongkan senarai
+            // assetGrid.innerHTML = '';
+            // adminAssetList.innerHTML = '';
+            // newLoanAssetSelect.innerHTML = '<option value="" disabled selected>Pilih aset...</option>';
+            
+            // snapshot.docs.forEach(doc => {
+            //     const asset = { id: doc.id, ...doc.data() };
+            //     // Tambah pada grid, senarai admin, dan dropdown
+            // });
+        }
+
+        /**
+         * Memuatkan semua pinjaman dari koleksi 'loans'
+         */
+        function loadLoans() {
+            console.log("Memuatkan pinjaman...");
+            const loansCollection = collection(db, 'loans');
+            
+            // TODO: Gunakan onSnapshot untuk mendengar perubahan masa nyata
+            // onSnapshot(loansCollection, (snapshot) => { ... });
+
+            // Rangka untuk paparan:
+            // const pendingList = document.getElementById('loan-list-pending');
+            // const approvedList = document.getElementById('loan-list-approved');
+            // const historyList = document.getElementById('loan-list-history');
+            // Kosongkan senarai
+            // pendingList.innerHTML = '';
+            // approvedList.innerHTML = '';
+            // historyList.innerHTML = '';
+
+            // snapshot.docs.forEach(doc => {
+            //     const loan = { id: doc.id, ...doc.data() };
+            //     // Asingkan ke senarai yang betul berdasarkan loan.status
+            //     if (loan.status === 'Pending') {
+            //         // ...
+            //     } else if (loan.status === 'Approved') {
+            //         // ...
+            //     } else {
+            //         // ...
+            //     }
+            // });
+        }
+
+        /**
+         * Mengosongkan semua senarai data (digunakan semasa log keluar)
+         */
+        function clearDataLists() {
+            document.getElementById('asset-grid').innerHTML = '<p class="text-gray-500 text-sm col-span-full">Sila log masuk untuk melihat aset.</p>';
+            document.getElementById('admin-asset-list').innerHTML = '<tr><td colspan="4" class="px-4 py-4 text-sm text-gray-500 text-center">Sila log masuk untuk mengurus aset.</td></tr>';
+            document.getElementById('new-loan-asset').innerHTML = '<option value="" disabled selected>Pilih aset...</option>';
+            document.getElementById('loan-list-pending').innerHTML = '<p class="text-gray-500 text-sm">Tiada permohonan baharu.</p>';
+            document.getElementById('loan-list-approved').innerHTML = '<p class="text-gray-500 text-sm">Tiada aset sedang dipinjam.</p>';
+            document.getElementById('loan-list-history').innerHTML = '<p class="text-gray-500 text-sm">Tiada sejarah pinjaman.</p>';
+        }
+
+        // --- PENGENDALI 'EVENT LISTENER' UNTUK BORANG ---
+        // (Rangka - perlu dilengkapkan)
+
+        document.getElementById('new-loan-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (!currentUserId) return; // Mesti log masuk
+            
+            console.log("Menghantar borang pinjaman...");
+            // TODO: Dapatkan nilai dari 'new-loan-name', 'new-loan-class', dll.
+            // TODO: Gunakan addDoc(collection(db, 'loans'), { ... })
+            // Jangan lupa tambah 'status: "Pending"', 'userId: currentUserId'
+        });
+
+        document.getElementById('add-asset-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (!isAdmin) return; // Mesti admin
+            
+            console.log("Menghantar borang aset baharu...");
+            // TODO: Dapatkan nilai dari 'add-asset-name', 'add-asset-type', dll.
+            // TODO: Gunakan addDoc(collection(db, 'items'), { ... })
+        });
+        
+        document.getElementById('edit-asset-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (!isAdmin) return; // Mesti admin
+            
+            console.log("Menyimpan perubahan aset...");
+            // const assetId = document.getElementById('edit-asset-id').value;
+            // TODO: Dapatkan nilai dari 'edit-asset-name', 'edit-asset-type', dll.
+            // TODO: Gunakan setDoc(doc(db, 'items', assetId), { ... })
+        });
+        
+        document.getElementById('delete-asset-btn').addEventListener('click', () => {
+            if (!isAdmin) return; // Mesti admin
+            
+            // const assetId = document.getElementById('edit-asset-id').value;
+            // if (confirm(`Adakah anda pasti mahu memadam aset ini? (ID: ${assetId})`)) {
+            //     console.log("Memadam aset...");
+            //     // TODO: Gunakan deleteDoc(doc(db, 'items', assetId))
+            // }
+        });
+        
+        document.getElementById('close-edit-modal-btn').addEventListener('click', () => {
+             document.getElementById('edit-asset-modal').classList.add('hidden');
+        });
+
+    </script>
     
 </body>
 </html>

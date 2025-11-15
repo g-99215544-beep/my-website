@@ -12,7 +12,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/plugin/customParseFormat.min.js"></script>
     <!-- 3. Sheet.js (untuk eksport Excel) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <!-- (BARU) Google Font: Inter -->
+    <!-- Google Font: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -43,27 +43,26 @@
                 border: 1px solid #000;
                 margin: 0;
                 padding: 0;
-                border-radius: 0; /* Tiada bucu bulat semasa cetak */
+                border-radius: 0;
             }
             .print-table {
                 width: 100%;
                 border-collapse: collapse;
-                table-layout: fixed; /* Penting untuk cetakan */
+                table-layout: fixed;
             }
             .print-table th, .print-table td {
-                border: 2px solid #000 !important; /* Pastikan garisan tebal semasa cetak */
+                border: 2px solid #000 !important;
                 padding: 4px;
-                font-size: 10px; /* Kecilkan fon untuk muat */
+                font-size: 10px;
                 text-align: center;
-                height: 60px; /* Tetapkan ketinggian */
+                height: 60px;
                 vertical-align: top;
                 overflow: hidden;
                 word-wrap: break-word;
             }
             .print-table select {
-                display: none; /* Sembunyikan dropdown */
+                display: none;
             }
-            /* Paparkan nilai yang dipilih untuk cetakan */
             .print-value {
                 display: block !important;
                 font-size: 11px;
@@ -74,19 +73,20 @@
                 font-weight: bold;
                 padding: 8px;
             }
-            /* Warna latar belakang untuk cetakan (mungkin tidak berfungsi di semua pelayar) */
+
+            /* Warna latar belakang untuk cetakan */
             .day-mo { background-color: #FFFF00 !important; }
             .day-tu { background-color: #92D050 !important; }
             .day-we { background-color: #00B0F0 !important; }
             .day-th { background-color: #FFC000 !important; }
             .day-fr { background-color: #FF00FF !important; }
-            /* Memaksa pelayar mencetak warna latar */
+
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
         }
-        
+
         .print-value {
-            display: none; /* Sembunyikan secara lalai */
+            display: none;
         }
     </style>
 </head>
@@ -130,27 +130,22 @@
                 <span class="text-xl font-medium text-gray-700">Memuatkan...</span>
             </div>
             <table id="schedule-table" class="min-w-full border-2 border-black print-table">
-                <!-- Header Jadual (Waktu) -->
                 <thead class="bg-teal-700 text-teal-50">
                     <tr>
                         <th class="w-28 p-2 text-sm font-bold border-2 border-black uppercase">HARI / WAKTU</th>
                         <!-- Waktu akan dijana oleh JS -->
                     </tr>
                 </thead>
-                <!-- Badan Jadual (Hari) -->
                 <tbody id="schedule-body">
                     <!-- Hari akan dijana oleh JS -->
                 </tbody>
             </table>
         </div>
 
-        <!-- Paparan Cetak Sahaja (Tersembunyi secara lalai) -->
+        <!-- Paparan Cetak Sahaja -->
         <div id="print-view" class="hidden">
-            <table id="print-table" class="min-w-full border-2 border-black print-table">
-                <!-- Kandungan cetak akan disalin di sini oleh JS -->
-            </table>
+            <table id="print-table" class="min-w-full border-2 border-black print-table"></table>
         </div>
-
 
         <!-- === 4. INFO BOX (TATACARA) === -->
         <div class="mt-6 sm:mt-8 p-4 sm:p-5 bg-yellow-100 border-l-4 border-yellow-500 rounded-lg shadow-md no-print">
@@ -219,10 +214,22 @@
                         <button id="admin-clear-btn" class="bg-red-600 text-white px-5 py-2 rounded-lg shadow hover:bg-red-700 transition">Kosongkan Jadual Minggu Ini</button>
                         <button id="admin-rollover-btn" class="bg-purple-600 text-white px-5 py-2 rounded-lg shadow hover:bg-purple-700 transition">Simpan & Mulakan Minggu Baru (Manual)</button>
                     </div>
-                    <div class="mt-4">
-                        <label for="manual-date-input" class="block text-sm font-medium text-gray-700 mb-1">Tukar Tarikh Mula Minggu Semasa (Isnin)</label>
-                        <input type="date" id="manual-date-input" class="p-2 border border-gray-300 rounded-lg shadow-sm">
-                        <button id="manual-date-btn" class="ml-2 bg-gray-600 text-white px-5 py-2 rounded-lg shadow hover:bg-gray-700 transition">Tetapkan Tarikh</button>
+
+                    <div class="mt-4 flex flex-wrap gap-2 items-center">
+                        <div>
+                            <label for="manual-date-input" class="block text-sm font-medium text-gray-700 mb-1">Tarikh Mula Minggu Semasa (Isnin)</label>
+                            <input type="date" id="manual-date-input" class="p-2 border border-gray-300 rounded-lg shadow-sm">
+                        </div>
+                        <button id="manual-date-btn" class="self-end bg-gray-600 text-white px-5 py-2 rounded-lg shadow hover:bg-gray-700 transition">Tetapkan Tarikh</button>
+                    </div>
+
+                    <!-- EDIT LABEL MINGGU -->
+                    <div class="mt-4 flex flex-wrap gap-2 items-center">
+                        <div>
+                            <label for="week-label-input" class="block text-sm font-medium text-gray-700 mb-1">Nama / Nombor Minggu</label>
+                            <input type="text" id="week-label-input" placeholder="cth: Minggu 1" class="p-2 border border-gray-300 rounded-lg shadow-sm w-48">
+                        </div>
+                        <button id="week-label-save-btn" class="self-end bg-indigo-600 text-white px-5 py-2 rounded-lg shadow hover:bg-indigo-700 transition">Simpan Label Minggu</button>
                     </div>
                 </div>
                 
@@ -291,14 +298,17 @@
         const CURRENT_WEEK_START_KEY = 'sk_sri_aman_current_week_start';
         const CLASS_OPTIONS_KEY = 'sk_sri_aman_class_options';
         const SUBJECT_OPTIONS_KEY = 'sk_sri_aman_subject_options';
+        const WEEK_LABEL_KEY = 'sk_sri_aman_week_label';
         const ADMIN_PASS = 'admin123';
 
         let currentSchedule = {};
         let weeklyArchive = [];
         let currentWeekStart;
+        let currentWeekLabel = 'Minggu Semasa';
         let autoSaveTimer;
         let archiveViewIndex = -1;
 
+        // DOM refs
         const tableHeader = document.querySelector("#schedule-table thead tr");
         const tableBody = document.getElementById("schedule-body");
         const weekDateDisplay = document.getElementById("week-date-display");
@@ -323,6 +333,8 @@
         const adminRolloverBtn = document.getElementById("admin-rollover-btn");
         const manualDateInput = document.getElementById("manual-date-input");
         const manualDateBtn = document.getElementById("manual-date-btn");
+        const weekLabelInput = document.getElementById("week-label-input");
+        const weekLabelSaveBtn = document.getElementById("week-label-save-btn");
         const archiveListContainer = document.getElementById("archive-list");
         const editClassOptions = document.getElementById("edit-class-options");
         const editSubjectOptions = document.getElementById("edit-subject-options");
@@ -334,15 +346,22 @@
         
         const printTable = document.getElementById("print-table");
 
+        // === 4. FUNGSI UTAMA ===
         function loadCurrentWeekStart() {
             if (!currentWeekStart) {
                 const savedDate = localStorage.getItem(CURRENT_WEEK_START_KEY);
-                let dateToUse = savedDate ? dayjs(savedDate) : dayjs("2025-11-03");
+                // Default = Isnin minggu semasa
+                let dateToUse = savedDate ? dayjs(savedDate) : dayjs().isoWeekday(1);
                 if (dateToUse.day() !== 1) {
                     dateToUse = dateToUse.isoWeekday(1);
                 }
                 currentWeekStart = dateToUse;
             }
+        }
+
+        function loadWeekLabelFromStorage() {
+            const savedLabel = localStorage.getItem(WEEK_LABEL_KEY);
+            currentWeekLabel = savedLabel || 'Minggu Semasa';
         }
 
         async function init() {
@@ -351,6 +370,7 @@
             initTableStructure();
             loadArchiveFromStorage();
             loadCurrentWeekStart();
+            loadWeekLabelFromStorage();
             await checkWeeklyRollover();
             loadScheduleFromStorage();
             renderWeekDate();
@@ -375,7 +395,7 @@
                 tr.className = `${day.bg}`;
                 
                 const th = document.createElement("th");
-                th.className = `p-2 text-lg sm:text-xl font-bold border-2 border-black text-gray-800 print-day-header`;
+                th.className = "p-2 text-lg sm:text-xl font-bold border-2 border-black text-gray-800 print-day-header";
                 th.textContent = day.label;
                 tr.appendChild(th);
 
@@ -436,6 +456,7 @@
             weekDateDisplay.textContent = `TARIKH: ${startDate} - ${endDate}`;
         }
 
+        // === 5. DATA MANAGEMENT ===
         function loadOptionsFromStorage() {
             const savedClassOpts = localStorage.getItem(CLASS_OPTIONS_KEY);
             const savedSubjectOpts = localStorage.getItem(SUBJECT_OPTIONS_KEY);
@@ -569,6 +590,7 @@
             selectElement.style.backgroundColor = color;
         }
         
+        // === 6. RENDERING ===
         function renderSchedule(data, isArchive = false) {
             if (!data) data = createEmptySchedule();
             
@@ -645,6 +667,7 @@
             loadingOverlay.style.display = 'none';
         }
 
+        // === 7. EVENT LISTENERS ===
         function initEventListeners() {
             tableBody.addEventListener("change", (event) => {
                 if (event.target && event.target.tagName === 'SELECT') {
@@ -707,10 +730,20 @@
             });
             
             initDropdownEditors();
+            initWeekLabelEditor();
+
             saveOptionsBtn.addEventListener("click", () => {
                 if (confirm("Menyimpan pilihan baru akan menjana semula jadual. Anda pasti?")) {
                     saveOptionsToStorage();
                 }
+            });
+
+            weekLabelSaveBtn.addEventListener("click", () => {
+                const val = weekLabelInput.value.trim();
+                currentWeekLabel = val || "Minggu Semasa";
+                localStorage.setItem(WEEK_LABEL_KEY, currentWeekLabel);
+                updateArchiveNav();
+                showToast("Label minggu telah dikemas kini!");
             });
         }
         
@@ -719,6 +752,11 @@
             editSubjectOptions.value = SUBJECT_OPTIONS.filter(opt => opt !== '').join(',');
         }
 
+        function initWeekLabelEditor() {
+            weekLabelInput.value = currentWeekLabel;
+        }
+
+        // === 8. ADMIN & ARKIB ===
         function openAdminModal() {
             adminModal.style.display = 'flex';
             adminPassword.value = '';
@@ -737,29 +775,32 @@
                 adminPanelView.style.display = 'block';
                 loadArchiveFromStorage();
                 initDropdownEditors();
+                initWeekLabelEditor();
             } else {
                 loginError.style.display = 'block';
             }
         }
         
+        // Rollover pada hari SABTU
         async function checkWeeklyRollover() {
             const today = dayjs();
-            if (today.day() === 0) { 
-                const lastRollover = localStorage.getItem('last_rollover_date');
-                const lastRolloverDate = lastRollover ? dayjs(lastRollover) : dayjs().subtract(10, 'days');
-                const thisSunday = today;
-                
-                if (!currentWeekStart) {
-                    loadCurrentWeekStart();
-                }
 
-                if (lastRolloverDate.isBefore(thisSunday, 'day')) {
+            // Hari Sabtu = 6
+            if (today.day() === 6) {
+                if (!currentWeekStart) loadCurrentWeekStart();
+
+                const lastRollover = localStorage.getItem('last_rollover_date');
+                const lastRolloverDate = lastRollover ? dayjs(lastRollover) : null;
+
+                // Hanya rollover jika belum pernah pada Sabtu ini
+                if (!lastRolloverDate || !lastRolloverDate.isSame(today, 'day')) {
+                    // Pastikan minggu stored adalah sebelum hari ini
                     if (currentWeekStart.isBefore(today, 'day')) {
                         showLoading("Memulakan minggu baru...");
                         await handleRollover(false);
-                        localStorage.setItem('last_rollover_date', thisSunday.format('YYYY-MM-DD'));
-                        showToast("Minggu baru telah dimulakan!");
+                        localStorage.setItem('last_rollover_date', today.format('YYYY-MM-DD'));
                         hideLoading();
+                        showToast("Minggu baru telah dimulakan!");
                     }
                 }
             }
@@ -789,6 +830,7 @@
                 currentSchedule = createEmptySchedule();
                 saveScheduleToStorage();
                 
+                // Minggu baru = tambah 7 hari (Isnin minggu hadapan)
                 currentWeekStart = currentWeekStart.add(7, 'days');
                 localStorage.setItem(CURRENT_WEEK_START_KEY, currentWeekStart.format("YYYY-MM-DD"));
                 
@@ -889,6 +931,7 @@
         }
         
         function updateArchiveNav() {
+            // Button state
             if (archiveViewIndex <= -1) {
                 archiveNextBtn.disabled = true;
                 archiveNextBtn.classList.add("opacity-50", "cursor-not-allowed");
@@ -905,16 +948,18 @@
                 archivePrevBtn.classList.remove("opacity-50", "cursor-not-allowed");
             }
             
+            // Status text
             if (archiveViewIndex === -1) {
-                archiveStatus.textContent = "Minggu Semasa";
+                archiveStatus.textContent = currentWeekLabel;
             } else if (weeklyArchive[archiveViewIndex]) {
                 archiveStatus.textContent = weeklyArchive[archiveViewIndex].label;
             } else {
-                archiveStatus.textContent = "Minggu Semasa";
+                archiveStatus.textContent = currentWeekLabel;
                 archiveViewIndex = -1;
             }
         }
 
+        // === 9. EKSPORT & CETAK ===
         function getDisplayedScheduleData() {
             if (archiveViewIndex === -1) {
                 return currentSchedule;
@@ -1004,6 +1049,7 @@
             window.print();
         }
 
+        // === 10. MULAKAN APP ===
         init();
     </script>
 

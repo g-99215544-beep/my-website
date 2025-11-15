@@ -1,969 +1,1011 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, 
-  signInWithEmailAndPassword, 
-  onAuthStateChanged, 
-  signOut 
-} from 'firebase/auth';
-import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
-  onSnapshot, 
-  query, 
-  orderBy, 
-  doc, 
-  updateDoc, 
-  deleteDoc,
-  serverTimestamp,
-  where,
-  writeBatch,
-  getDocs // Perlu untuk clearOldLoans
-} from 'firebase/firestore';
-import {
-  getStorage,
-  ref,
-  uploadBytesResumable,
-  getDownloadURL,
-  deleteObject // Untuk memadam gambar lama jika perlu
-} from 'firebase/storage';
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jadual Makmal Komputer SK Sri Aman</title>
+    <!-- 1. Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 2. Day.js (untuk pengurusan tarikh) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/dayjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/plugin/isoWeek.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/plugin/customParseFormat.min.js"></script>
+    <!-- 3. Sheet.js (untuk eksport Excel) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- (BARU) Google Font: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-// --- Konfigurasi Firebase ---
-// (Nota: Akaun admin 'gurubesar@sksa.com' & 'guruict@sksa.com' mesti
-// dibuat secara manual di dalam Firebase Authentication Console)
-const firebaseConfig = typeof __firebase_config !== 'undefined' 
-  ? JSON.parse(__firebase_config) 
-  : {
-      apiKey: "AIzaSyCV5skKQO1i-T6pOckTEyhDG8H4fh7vS7s",
-      authDomain: "sistem-pinjaman-aset-ict-v2.firebaseapp.com",
-      projectId: "sistem-pinjaman-aset-ict-v2",
-      storageBucket: "sistem-pinjaman-aset-ict-v2.firebasestorage.app",
-      messagingSenderId: "1013418266777",
-      appId: "1:1013418266777:web:f3ec4d5f38fe7b87b76808",
-      measurementId: "G-9CQDWM207Z"
-    };
-
-// Dapatkan ID Apl
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'sistem-pinjaman-ict';
-
-// --- Inisialisasi Firebase ---
-let app, auth, db, storage;
-try {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-  storage = getStorage(app); // Inisialisasi Firebase Storage
-} catch (error) {
-  console.error("Ralat Inisialisasi Firebase:", error);
-}
-
-// --- Koleksi Firestore ---
-// DIKEMAS KINI: Laluan (path) ditukar kepada 'asetICT' dan 'loans'
-const getLoansCollection = () => collection(db, `artifacts/${appId}/public/data/loans`);
-const getAssetsCollection = () => collection(db, `artifacts/${appId}/public/data/asetICT`); // Ditukar dari 'items'
-const getLoanDoc = (id) => doc(db, `artifacts/${appId}/public/data/loans/${id}`);
-const getAssetDoc = (id) => doc(db, `artifacts/${appId}/public/data/asetICT/${id}`); // Ditukar dari 'items'
-
-// --- Komponen Bantuan ---
-
-// Komponen Modal
-const Modal = ({ isOpen, onClose, title, children }) => {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6 m-4 overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-xl font-medium leading-6 text-gray-900 mb-4">{title}</h3>
-        <div className="text-sm text-gray-600">{children}</div>
-      </div>
-    </div>
-  );
-};
-
-// Komponen Spinner
-const Spinner = () => (
-  <div className="flex justify-center items-center p-10">
-    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
-  </div>
-);
-
-// Format Tarikh
-const formatDate = (timestamp) => {
-  if (!timestamp) return 'N/A';
-  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  return date.toLocaleDateString('ms-MY', { day: '2-digit', month: '2-digit', year: 'numeric' });
-};
-
-// --- Komponen Teras: Mod Guru ---
-
-// Borang Permohonan Pinjaman
-const LoanForm = ({ assets, onSubmitSuccess }) => {
-  const [formData, setFormData] = useState({
-    namaGuru: '',
-    noKP: '',
-    tarikhPinjam: '',
-    tarikhPulang: '',
-    tujuan: '',
-    asetId: '',
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  // Sediakan senarai aset untuk <select>, hanya yang ada 'jumlah' > 0
-  const availableAssets = useMemo(() => {
-    return assets.filter(a => a.jumlah > 0);
-  }, [assets]);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!formData.asetId) {
-      setError("Sila pilih aset ICT.");
-      return;
-    }
-    setLoading(true);
-    setError('');
-
-    try {
-      const selectedAsset = assets.find(a => a.id === formData.asetId);
-      if (!selectedAsset) throw new Error("Aset tidak ditemui.");
-      
-      // Semak jika tarikh pulang sebelum tarikh pinjam
-      if (new Date(formData.tarikhPulang) < new Date(formData.tarikhPinjam)) {
-        setError("Tarikh pulang tidak boleh lebih awal dari tarikh pinjam.");
-        setLoading(false);
-        return;
-      }
-
-      await addDoc(getLoansCollection(), {
-        ...formData,
-        asetNama: selectedAsset.nama, // Simpan nama aset untuk rujukan
-        status: 'Baharu', // Status: Baharu, Diluluskan, Ditolak, Selesai
-        timestamp: serverTimestamp(),
-      });
-      
-      onSubmitSuccess();
-      setFormData({
-        namaGuru: '', noKP: '', tarikhPinjam: '', tarikhPulang: '', tujuan: '', asetId: '',
-      });
-    } catch (err) {
-      console.error("Ralat menghantar permohonan:", err);
-      setError("Permohonan gagal dihantar. Sila cuba lagi.");
-    }
-    setLoading(false);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {/* ... (Medan Borang Nama, KP, Tarikh, Tujuan dikekalkan seperti asal) ... */}
-      <div>
-        <label htmlFor="namaGuru" className="block text-sm font-medium text-gray-700">Nama Guru</label>
-        <input type="text" name="namaGuru" id="namaGuru" value={formData.namaGuru} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
-      </div>
-      <div>
-        <label htmlFor="noKP" className="block text-sm font-medium text-gray-700">No Kad Pengenalan</label>
-        <input type="text" name="noKP" id="noKP" value={formData.noKP} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="tarikhPinjam" className="block text-sm font-medium text-gray-700">Tarikh Pinjam</label>
-          <input type="date" name="tarikhPinjam" id="tarikhPinjam" value={formData.tarikhPinjam} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
-        </div>
-        <div>
-          <label htmlFor="tarikhPulang" className="block text-sm font-medium text-gray-700">Tarikh Pulang</label>
-          <input type="date" name="tarikhPulang" id="tarikhPulang" value={formData.tarikhPulang} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
-        </div>
-      </div>
-      <div>
-        <label htmlFor="tujuan" className="block text-sm font-medium text-gray-700">Tujuan Pinjaman</label>
-        <textarea name="tujuan" id="tujuan" rows="3" value={formData.tujuan} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></textarea>
-      </div>
-      <div>
-        <label htmlFor="asetId" className="block text-sm font-medium text-gray-700">Pilih Aset ICT</label>
-        <select
-          name="asetId"
-          id="asetId"
-          value={formData.asetId}
-          onChange={handleChange}
-          required
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-        >
-          <option value="">-- Sila Pilih Aset --</option>
-          {availableAssets.map(asset => (
-            <option key={asset.id} value={asset.id}>
-              {asset.nama} ({asset.kategori}) - {asset.jumlah} tersedia
-            </option>
-          ))}
-        </select>
-      </div>
-      {error && <p className="text-red-600 text-sm">{error}</p>}
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full px-6 py-3 bg-green-600 text-white rounded-md font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:bg-gray-400"
-      >
-        {loading ? "Menghantar..." : "Hantar Permohonan"}
-      </button>
-    </form>
-  );
-};
-
-// [BARU] Komponen Kad Aset
-const AssetCard = ({ asset }) => {
-  const placeholderImage = "https://placehold.co/600x400/e2e8f0/64748b?text=Tiada+Gambar";
-  return (
-    <div className="bg-white shadow-lg rounded-lg overflow-hidden transition-shadow duration-300 hover:shadow-xl">
-      <img
-        src={asset.gambarURL || placeholderImage}
-        alt={asset.nama}
-        className="w-full h-48 object-cover"
-        onError={(e) => { e.target.onerror = null; e.target.src = placeholderImage; }}
-      />
-      <div className="p-4">
-        <h4 className="text-lg font-semibold text-gray-800 truncate" title={asset.nama}>
-          💻 {asset.nama}
-        </h4>
-        <p className="text-sm text-gray-500 mb-2">
-          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold">
-            📁 {asset.kategori}
-          </span>
-        </p>
-        <p className="text-sm text-gray-600 mb-3" title={asset.spesifikasi}>
-          <span className="font-medium">Spesifikasi:</span> {asset.spesifikasi ? asset.spesifikasi.substring(0, 50) + '...' : 'N/A'}
-        </p>
-        <div className="flex justify-between items-center">
-          <span className="text-base font-bold text-blue-700">📦 {asset.jumlah} Unit</span>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// [DIKEMAS KINI] Paparan Senarai Aset (untuk Guru) - Guna Kad
-const AssetListDisplay = ({ assets, loading }) => {
-  return (
-    <div className="bg-white shadow-lg rounded-lg p-6">
-      <h3 className="text-xl font-semibold text-gray-800 mb-4">Aset ICT Tersedia</h3>
-      {loading ? <Spinner /> : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {assets.length > 0 ? assets.map(asset => (
-            <AssetCard key={asset.id} asset={asset} />
-          )) : (
-            <p className="text-gray-500 col-span-full text-center">Tiada aset tersedia pada masa ini.</p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Halaman Utama Guru
-const TeacherPage = ({ assets, loadingAssets, onSubmitSuccess }) => {
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      {/* Kiri: Borang Permohonan */}
-      <div className="bg-white shadow-lg rounded-lg p-6 lg:p-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Borang Permohonan Pinjaman Aset ICT</h2>
-        <LoanForm assets={assets} onSubmitSuccess={onSubmitSuccess} />
-      </div>
-      
-      {/* Kanan: Senarai Aset (Guna Kad) */}
-      <div className="lg:pt-8">
-        <AssetListDisplay assets={assets} loading={loadingAssets} />
-      </div>
-    </div>
-  );
-};
-
-
-// --- Komponen Teras: Mod Admin ---
-
-// Halaman Log Masuk Admin
-const AdminLoginPage = ({ setCurrentView }) => {
-  // ... (Kod dikekalkan seperti asal) ...
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    try {
-      // Cuba log masuk dengan akaun yang disediakan
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (err) {
-      setError("Log masuk gagal. Sila semak emel dan kata laluan anda.");
-      console.error("Ralat log masuk:", err);
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="flex justify-center items-center pt-10">
-      <div className="w-full max-w-md bg-white shadow-lg rounded-lg p-8">
-        <h2 className="text-2xl font-bold text-center text-gray-900 mb-6">Log Masuk Admin</h2>
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">Emel</label>
-            <input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
-          </div>
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">Kata Laluan</label>
-            <input type="password" id="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" />
-          </div>
-          {error && <p className="text-red-600 text-sm">{error}</p>}
-          <button type="submit" disabled={loading} className="w-full px-6 py-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400">
-            {loading ? "Memproses..." : "Log Masuk"}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-// Komponen Senarai Permohonan (Admin)
-const LoanRequestList = ({ loans, loading, onUpdateStatus, onClearOld }) => {
-  // ... (Kod dikekalkan seperti asal, menggunakan paparan jadual untuk permohonan) ...
-  const filterLoans = (status) => loans.filter(loan => loan.status === status);
-  const newLoans = filterLoans('Baharu');
-  const approvedLoans = filterLoans('Diluluskan');
-  const historyLoans = loans.filter(loan => loan.status === 'Ditolak' || loan.status === 'Selesai');
-
-  const renderLoanRow = (loan) => (
-    <tr key={loan.id} className="hover:bg-gray-50">
-      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-        {loan.namaGuru}
-        <span className="block text-xs text-gray-500">{loan.noKP}</span>
-      </td>
-      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{loan.asetNama}</td>
-      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-        {loan.tarikhPinjam} - {loan.tarikhPulang}
-      </td>
-      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 max-w-xs truncate" title={loan.tujuan}>{loan.tujuan}</td>
-      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{formatDate(loan.timestamp)}</td>
-      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium space-x-2">
-        {loan.status === 'Baharu' && (
-          <>
-            <button onClick={() => onUpdateStatus(loan.id, 'Diluluskan')} className="text-green-600 hover:text-green-800">Lulus</button>
-            <button onClick={() => onUpdateStatus(loan.id, 'Ditolak')} className="text-red-600 hover:text-red-800">Tolak</button>
-          </>
-        )}
-        {loan.status === 'Diluluskan' && (
-          <button onClick={() => onUpdateStatus(loan.id, 'Selesai')} className="text-blue-600 hover:text-blue-800">Tanda Selesai</button>
-        )}
-      </td>
-    </tr>
-  );
-
-  const renderHistoryRow = (loan) => (
-    <tr key={loan.id} className="hover:bg-gray-50">
-      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{loan.namaGuru}</td>
-      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{loan.asetNama}</td>
-      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{formatDate(loan.timestamp)}</td>
-      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
-        {loan.status === 'Selesai' && <span className="text-green-700">Selesai</span>}
-        {loan.status === 'Ditolak' && <span className="text-red-700">Ditolak</span>}
-      </td>
-    </tr>
-  );
-
-  return (
-    <div className="space-y-8">
-      {loading && <Spinner />}
-      {/* ... (Jadual untuk Permohonan Baharu, Diluluskan, Rekod dikekalkan seperti asal) ... */}
-      {/* Permohonan Baharu */}
-      <div className="bg-white shadow-lg rounded-lg overflow-hidden">
-        <h3 className="text-lg font-semibold text-gray-800 p-4 bg-gray-50 border-b">Permohonan Baharu</h3>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Guru</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Aset</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Tarikh</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Tujuan</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Dihantar</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Tindakan</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {newLoans.length > 0 ? newLoans.map(renderLoanRow) : (
-                <tr><td colSpan="6" className="text-center p-4 text-gray-500">Tiada permohonan baharu.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Pinjaman Diluluskan (Belum Pulang) */}
-      <div className="bg-white shadow-lg rounded-lg overflow-hidden">
-        <h3 className="text-lg font-semibold text-gray-800 p-4 bg-gray-50 border-b">Pinjaman Diluluskan (Belum Pulang)</h3>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Guru</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Aset</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Tarikh</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Tujuan</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Dihantar</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Tindakan</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {approvedLoans.length > 0 ? approvedLoans.map(renderLoanRow) : (
-                <tr><td colSpan="6" className="text-center p-4 text-gray-500">Tiada pinjaman yang sedang aktif.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Rekod Pinjaman (Selesai / Ditolak) */}
-      <div className="bg-white shadow-lg rounded-lg overflow-hidden">
-        <div className="flex justify-between items-center p-4 bg-gray-50 border-b">
-          <h3 className="text-lg font-semibold text-gray-800">Rekod Pinjaman (Arkib)</h3>
-          <button onClick={onClearOld} className="px-3 py-1 text-sm bg-red-500 text-white rounded-md hover:bg-red-600">
-            Kosongkan Rekod Lama
-          </button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Guru</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Aset</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Dihantar</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Status</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {historyLoans.length > 0 ? historyLoans.map(renderHistoryRow) : (
-                <tr><td colSpan="4" className="text-center p-4 text-gray-500">Tiada rekod sejarah.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// [DIKEMAS KINI BESAR] Komponen Pengurusan Aset (Admin) - Guna Kad & Storan
-const AssetManagement = ({ assets, loading, onAddAsset, onUpdateAsset, onDeleteAsset }) => {
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editAsset, setEditAsset] = useState(null); // { id, nama, jumlah, kategori, ... }
-
-  const kategoriOptions = ["Laptop", "Tablet", "Projector", "Lain-lain"];
-  const placeholderImage = "https://placehold.co/600x400/e2e8f0/64748b?text=Tiada+Gambar";
-
-  // Komponen borang dalaman untuk Tambah/Edit
-  const AssetForm = ({ initialData, onSubmit, onCancel, isEditing }) => {
-    const [formData, setFormData] = useState(
-      initialData || { nama: '', jumlah: 1, kategori: 'Laptop', spesifikasi: '', gambarURL: '' }
-    );
-    const [imageFile, setImageFile] = useState(null); // Fail gambar baharu
-    const [uploadProgress, setUploadProgress] = useState(0);
-    const [formLoading, setFormLoading] = useState(false);
-
-    const handleChange = (e) => {
-      const { name, value } = e.target;
-      setFormData(prev => ({ ...prev, [name]: value }));
-    };
-
-    const handleFileChange = (e) => {
-      if (e.target.files[0]) {
-        setImageFile(e.target.files[0]);
-      }
-    };
-
-    const handleSubmit = async (e) => {
-      e.preventDefault();
-      setFormLoading(true);
-      
-      let finalGambarURL = formData.gambarURL; // Kekalkan gambar sedia ada
-
-      if (imageFile) {
-        // Jika ada fail baharu, muat naik
-        try {
-          const storageRef = ref(storage, `aset-images/${appId}/${Date.now()}_${imageFile.name}`);
-          const uploadTask = uploadBytesResumable(storageRef, imageFile);
-
-          await new Promise((resolve, reject) => {
-            uploadTask.on('state_changed',
-              (snapshot) => {
-                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                setUploadProgress(progress);
-              },
-              (error) => {
-                console.error("Upload failed:", error);
-                reject(error);
-              },
-              async () => {
-                finalGambarURL = await getDownloadURL(uploadTask.snapshot.ref);
-                resolve();
-              }
-            );
-          });
-          
-          // TODO: Padam gambar lama dari storage jika edit dan gambar baharu dimuat naik
-          
-        } catch (err) {
-          console.error("Ralat muat naik gambar:", err);
-          setFormLoading(false);
-          return; // Hentikan jika gagal muat naik
+    <style>
+        /* Sembunyikan 'spinner' pada input nombor */
+        input[type='number']::-webkit-inner-spin-button,
+        input[type='number']::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
         }
-      }
-
-      // Hantar data ke fungsi 'App'
-      await onSubmit({
-        ...formData,
-        jumlah: parseInt(formData.jumlah, 10),
-        gambarURL: finalGambarURL
-      });
-      
-      setFormLoading(false);
-      onCancel(); // Tutup modal
-    };
-
-    return (
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="nama" className="block text-sm font-medium text-gray-700">Nama Aset</label>
-          <input type="text" id="nama" name="nama" value={formData.nama} onChange={handleChange} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" />
-        </div>
-        <div>
-          <label htmlFor="kategori" className="block text-sm font-medium text-gray-700">Kategori</label>
-          <select id="kategori" name="kategori" value={formData.kategori} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm">
-            {kategoriOptions.map(kat => <option key={kat} value={kat}>{kat}</option>)}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="jumlah" className="block text-sm font-medium text-gray-700">Jumlah</label>
-          <input type="number" id="jumlah" name="jumlah" value={formData.jumlah} onChange={handleChange} min="0" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" />
-        </div>
-        <div>
-          <label htmlFor="spesifikasi" className="block text-sm font-medium text-gray-700">Spesifikasi</label>
-          <textarea id="spesifikasi" name="spesifikasi" value={formData.spesifikasi} onChange={handleChange} rows="3" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></textarea>
-        </div>
-        <div>
-          <label htmlFor="gambar" className="block text-sm font-medium text-gray-700">Gambar Aset</label>
-          {formData.gambarURL && !imageFile && (
-            <img src={formData.gambarURL} alt="Preview" className="w-32 h-32 object-cover rounded-md my-2" />
-          )}
-          <input type="file" id="gambar" name="gambar" onChange={handleFileChange} accept="image/png, image/jpeg" className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-        </div>
-        {formLoading && (
-          <div className="w-full bg-gray-200 rounded-full">
-            <div className="bg-blue-600 text-xs font-medium text-blue-100 text-center p-0.5 leading-none rounded-full" style={{ width: `${uploadProgress}%` }}>
-              {uploadProgress > 0 ? `${Math.round(uploadProgress)}%` : "Memuat naik..."}
-            </div>
-          </div>
-        )}
-        <div className="flex justify-end space-x-3 pt-4">
-          <button type="button" onClick={onCancel} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md font-medium hover:bg-gray-300">
-            Batal
-          </button>
-          <button type="submit" disabled={formLoading} className="px-4 py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 disabled:bg-gray-400">
-            {formLoading ? "Menyimpan..." : (isEditing ? "Simpan Perubahan" : "Tambah Aset")}
-          </button>
-        </div>
-      </form>
-    );
-  };
-
-  return (
-    <div className="bg-white shadow-lg rounded-lg">
-      <div className="flex justify-between items-center p-4 bg-gray-50 border-b">
-        <h3 className="text-lg font-semibold text-gray-800">Pengurusan Aset ICT</h3>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 bg-green-600 text-white rounded-md font-medium hover:bg-green-700"
-        >
-          Tambah Aset
-        </button>
-      </div>
-
-      {loading && <Spinner />}
-      
-      {/* [DIKEMAS KINI] Paparan Aset Guna Kad */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6">
-        {assets.map(asset => (
-          <div key={asset.id} className="relative">
-            <AssetCard asset={asset} />
-            <div className="flex justify-center space-x-2 mt-2 p-2 bg-gray-50 rounded-b-md">
-              <button onClick={() => setEditAsset(asset)} className="text-sm px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600">Edit</button>
-              <button onClick={() => onDeleteAsset(asset.id, asset.gambarURL)} className="text-sm px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600">Padam</button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Modal Tambah Aset */}
-      <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} title="Tambah Aset Baharu">
-        <AssetForm
-          onSubmit={onAddAsset}
-          onCancel={() => setShowAddModal(false)}
-          isEditing={false}
-        />
-      </Modal>
-
-      {/* Modal Edit Aset */}
-      <Modal isOpen={!!editAsset} onClose={() => setEditAsset(null)} title="Edit Aset">
-        {editAsset && (
-          <AssetForm
-            initialData={editAsset}
-            onSubmit={(data) => onUpdateAsset(editAsset.id, data)}
-            onCancel={() => setEditAsset(null)}
-            isEditing={true}
-          />
-        )}
-      </Modal>
-    </div>
-  );
-};
-
-// Komponen Dashboard Admin
-const AdminDashboardPage = ({ assets, loans, loadingAssets, loadingLoans, handlers }) => {
-  // ... (Kod dikekalkan seperti asal) ...
-  const [adminView, setAdminView] = useState('rekodPinjaman'); // rekodPinjaman, urusAset
-
-  return (
-    <div className="space-y-6">
-      {/* Navigasi Admin */}
-      <div className="flex space-x-4 border-b-2 border-gray-200">
-        <button
-          onClick={() => setAdminView('rekodPinjaman')}
-          className={`px-4 py-2 font-medium ${adminView === 'rekodPinjaman' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-        >
-          Rekod Pinjaman
-        </button>
-        <button
-          onClick={() => setAdminView('urusAset')}
-          className={`px-4 py-2 font-medium ${adminView === 'urusAset' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-        >
-          Urus Aset
-        </button>
-        <button
-          onClick={handlers.onExportCSV}
-          className="ml-auto px-4 py-2 bg-gray-600 text-white rounded-md font-medium hover:bg-gray-700 text-sm"
-        >
-          Eksport CSV
-        </button>
-      </div>
-
-      {/* Paparan Kandungan Admin */}
-      <div>
-        {adminView === 'rekodPinjaman' && (
-          <LoanRequestList
-            loans={loans}
-            loading={loadingLoans}
-            onUpdateStatus={handlers.onUpdateLoanStatus}
-            onClearOld={handlers.onClearOldLoans}
-          />
-        )}
-        {adminView === 'urusAset' && (
-          <AssetManagement
-            assets={assets}
-            loading={loadingAssets}
-            onAddAsset={handlers.onAddAsset}
-            onUpdateAsset={handlers.onUpdateAsset}
-            onDeleteAsset={handlers.onDeleteAsset}
-          />
-        )}
-      </div>
-    </div>
-  );
-};
-
-
-// --- Komponen Utama: App ---
-function App() {
-  const [user, setUser] = useState(null); // Objek user Firebase
-  const [loadingAuth, setLoadingAuth] = useState(true);
-  const [currentView, setCurrentView] = useState('permohonan'); // permohonan, adminLogin
-  
-  const [assets, setAssets] = useState([]);
-  const [loadingAssets, setLoadingAssets] = useState(true);
-  
-  const [loans, setLoans] = useState([]);
-  const [loadingLoans, setLoadingLoans] = useState(true);
-
-  const [successModalOpen, setSuccessModalOpen] = useState(false);
-  const [error, setError] = useState(null);
-
-  // 1. Kesan Pengesahan (Authentication)
-  useEffect(() => {
-    // ... (Kod dikekalkan seperti asal) ...
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        setCurrentView('adminDashboard');
-      } else if (currentView === 'adminDashboard') {
-        setCurrentView('adminLogin');
-      }
-      setLoadingAuth(false);
-    });
-    return () => unsubscribe();
-  }, [currentView]);
-
-  // 2. Kesan Muat Turun Data (Aset)
-  useEffect(() => {
-    // ... (Kod dikekalkan seperti asal, tetapi kini merujuk 'getAssetsCollection') ...
-    const q = query(getAssetsCollection(), orderBy('nama', 'asc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setAssets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setLoadingAssets(false);
-    }, (err) => {
-      console.error(err);
-      setError("Gagal memuat turun data aset.");
-      setLoadingAssets(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // 3. Kesan Muat Turun Data (Pinjaman)
-  useEffect(() => {
-    // ... (Kod dikekalkan seperti asal) ...
-    if (user) { 
-      setLoadingLoans(true);
-      const q = query(getLoansCollection(), orderBy('timestamp', 'desc'));
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        setLoans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        setLoadingLoans(false);
-      }, (err) => {
-        console.error(err);
-        setError("Gagal memuat turun data pinjaman.");
-        setLoadingLoans(false);
-      });
-      return () => unsubscribe();
-    } else {
-      setLoans([]); 
-      setLoadingLoans(false);
-    }
-  }, [user]); 
-
-
-  // --- Pengendali Logik (Handlers) ---
-
-  const handleLogout = async () => {
-    // ... (Kod dikekalkan seperti asal) ...
-    await signOut(auth);
-    setCurrentView('permohonan');
-  };
-
-  const handleLoanSubmitSuccess = () => {
-    // ... (Kod dikekalkan seperti asal) ...
-    setSuccessModalOpen(true);
-  };
-
-  // [DIKEMAS KINI] Pengendali untuk Mod Admin
-  const adminHandlers = {
-    // Pengendali Pinjaman
-    onUpdateLoanStatus: async (id, status) => {
-      // ... (Kod dikekalkan seperti asal) ...
-      try {
-        await updateDoc(getLoanDoc(id), { status: status });
-      } catch (err) {
-        console.error("Ralat kemaskini status:", err);
-        setError("Gagal mengemaskini status.");
-      }
-    },
-    onClearOldLoans: async () => {
-      // ... (Kod dikekalkan seperti asal) ...
-      if (!window.confirm("Anda pasti mahu memadam semua rekod yang telah 'Selesai' atau 'Ditolak'? Tindakan ini tidak boleh diundur.")) {
-        return;
-      }
-      try {
-        const q = query(getLoansCollection(), where('status', 'in', ['Selesai', 'Ditolak']));
-        const snapshot = await getDocs(q); // Pastikan getDocs diimport
-        const batch = writeBatch(db);
-        snapshot.docs.forEach(doc => {
-          batch.delete(doc.ref);
-        });
-        await batch.commit();
-      } catch (err) {
-        console.error("Ralat memadam rekod lama:", err);
-        setError("Gagal memadam rekod lama.");
-      }
-    },
-    
-    // [DIKEMAS KINI] Pengendali Aset (termasuk spesifikasi/gambar)
-    onAddAsset: async (assetData) => {
-      try {
-        await addDoc(getAssetsCollection(), {
-          ...assetData,
-          createdAt: serverTimestamp()
-        });
-      } catch (err) {
-        console.error("Ralat menambah aset:", err);
-        setError("Gagal menambah aset.");
-      }
-    },
-    onUpdateAsset: async (id, assetData) => {
-      try {
-        await updateDoc(getAssetDoc(id), assetData);
-      } catch (err) {
-        console.error("Ralat mengemaskini aset:", err);
-        setError("Gagal mengemaskini aset.");
-      }
-    },
-    onDeleteAsset: async (id, gambarURL) => {
-      if (window.confirm("Anda pasti mahu memadam aset ini?")) {
-        try {
-          // 1. Padam dokumen dari Firestore
-          await deleteDoc(getAssetDoc(id));
-          
-          // 2. Padam gambar dari Storage (jika ada)
-          if (gambarURL) {
-            const imageRef = ref(storage, gambarURL);
-            await deleteObject(imageRef).catch((err) => {
-              // Mungkin gagal jika peraturan storage tidak betul, tapi teruskan
-              console.warn("Gagal memadam gambar lama:", err);
-            });
-          }
-        } catch (err) {
-          console.error("Ralat memadam aset:", err);
-          setError("Gagal memadam aset.");
+        input[type='number'] {
+            -moz-appearance: textfield;
         }
-      }
-    },
 
-    // Pengendali Eksport
-    onExportCSV: () => {
-      // ... (Kod dikekalkan seperti asal) ...
-      if (loans.length === 0) {
-        alert("Tiada data untuk dieksport.");
-        return;
-      }
-      let csvContent = "data:text/csv;charset=utf-8,";
-      const headers = ["ID", "Nama Guru", "No KP", "Aset", "Tarikh Pinjam", "Tarikh Pulang", "Tujuan", "Status", "Tarikh Mohon (DD/MM/YYYY)"];
-      csvContent += headers.join(",") + "\r\n";
-      loans.forEach(loan => {
-        const row = [
-          loan.id,
-          `"${loan.namaGuru || ''}"`,
-          `"${(loan.noKP || '').toString()}"`,
-          `"${loan.asetNama || ''}"`,
-          `"${loan.tarikhPinjam || ''}"`,
-          `"${loan.tarikhPulang || ''}"`,
-          `"${(loan.tujuan || '').replace(/"/g, '""')}"`,
-          `"${loan.status || ''}"`,
-          `"${formatDate(loan.timestamp)}"`
+        /* Gaya cetak */
+        @media print {
+            body {
+                font-family: 'Inter', Arial, sans-serif;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .print-container {
+                width: 100%;
+                max-width: 100%;
+                box-shadow: none;
+                border: 1px solid #000;
+                margin: 0;
+                padding: 0;
+                border-radius: 0; /* Tiada bucu bulat semasa cetak */
+            }
+            .print-table {
+                width: 100%;
+                border-collapse: collapse;
+                table-layout: fixed; /* Penting untuk cetakan */
+            }
+            .print-table th, .print-table td {
+                border: 2px solid #000 !important; /* Pastikan garisan tebal semasa cetak */
+                padding: 4px;
+                font-size: 10px; /* Kecilkan fon untuk muat */
+                text-align: center;
+                height: 60px; /* Tetapkan ketinggian */
+                vertical-align: top;
+                overflow: hidden;
+                word-wrap: break-word;
+            }
+            .print-table select {
+                display: none; /* Sembunyikan dropdown */
+            }
+            /* Paparkan nilai yang dipilih untuk cetakan */
+            .print-value {
+                display: block !important;
+                font-size: 11px;
+                font-weight: bold;
+            }
+            .print-day-header {
+                font-size: 14px;
+                font-weight: bold;
+                padding: 8px;
+            }
+            /* Warna latar belakang untuk cetakan (mungkin tidak berfungsi di semua pelayar) */
+            .day-mo { background-color: #FFFF00 !important; }
+            .day-tu { background-color: #92D050 !important; }
+            .day-we { background-color: #00B0F0 !important; }
+            .day-th { background-color: #FFC000 !important; }
+            .day-fr { background-color: #FF00FF !important; }
+            /* Memaksa pelayar mencetak warna latar */
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        
+        .print-value {
+            display: none; /* Sembunyikan secara lalai */
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 p-4 sm:p-6 md:p-8" style="font-family: 'Inter', sans-serif;">
+
+    <div class="max-w-full mx-auto bg-white rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 print-container">
+        
+        <!-- === 1. HEADER === -->
+        <header class="flex flex-col sm:flex-row items-center justify-between mb-4 sm:mb-6 pb-4 border-b-2 border-gray-200">
+            <div class="flex items-center mb-3 sm:mb-0">
+                <!-- Logo Sekolah -->
+                <img src="https://i.imgur.com/AfsVtVG.jpeg" alt="Logo Sekolah" class="h-16 w-16 sm:h-20 sm:w-20 mr-4 rounded-md border-2 border-gray-300 no-print">
+                <div>
+                    <h1 class="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">
+                        JADUAL MAKMAL KOMPUTER SK SRI AMAN 2025
+                    </h1>
+                    <p id="week-date-display" class="text-base sm:text-lg text-gray-600 font-medium">
+                        TARIKH: 3 - 7 NOVEMBER 2025
+                    </p>
+                </div>
+            </div>
+            <button id="admin-login-btn" class="no-print bg-blue-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-700 transition duration-300 font-medium">
+                Panel Admin
+            </button>
+        </header>
+
+        <!-- === 2. TOOLBAR (Navigasi Sahaja) === -->
+        <div class="mb-4 flex flex-wrap gap-2 justify-between items-center no-print">
+            <!-- Navigasi Arkib -->
+            <div class="flex items-center gap-2">
+                <button id="archive-prev" class="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-100 transition shadow-sm" title="Minggu Sebelumnya">&lt;</button>
+                <span id="archive-status" class="text-sm font-medium text-gray-700 w-40 text-center">Minggu Semasa</span>
+                <button id="archive-next" class="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-100 transition shadow-sm" title="Minggu Seterusnya">&gt;</button>
+            </div>
+        </div>
+
+        <!-- === 3. TABLE CONTAINER === -->
+        <div class="overflow-x-auto w-full relative no-print rounded-xl shadow-inner border border-gray-200">
+            <div id="loading-overlay" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-20 rounded-xl" style="display: none;">
+                <span class="text-xl font-medium text-gray-700">Memuatkan...</span>
+            </div>
+            <table id="schedule-table" class="min-w-full border-2 border-black print-table">
+                <!-- Header Jadual (Waktu) -->
+                <thead class="bg-teal-700 text-teal-50">
+                    <tr>
+                        <th class="w-28 p-2 text-sm font-bold border-2 border-black uppercase">HARI / WAKTU</th>
+                        <!-- Waktu akan dijana oleh JS -->
+                    </tr>
+                </thead>
+                <!-- Badan Jadual (Hari) -->
+                <tbody id="schedule-body">
+                    <!-- Hari akan dijana oleh JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Paparan Cetak Sahaja (Tersembunyi secara lalai) -->
+        <div id="print-view" class="hidden">
+            <table id="print-table" class="min-w-full border-2 border-black print-table">
+                <!-- Kandungan cetak akan disalin di sini oleh JS -->
+            </table>
+        </div>
+
+
+        <!-- === 4. INFO BOX (TATACARA) === -->
+        <div class="mt-6 sm:mt-8 p-4 sm:p-5 bg-yellow-100 border-l-4 border-yellow-500 rounded-lg shadow-md no-print">
+            <h3 class="text-lg sm:text-xl font-bold text-yellow-800 mb-3">TATACARA PENGGUNAAN LAPTOP</h3>
+            <ol class="list-decimal list-inside text-sm sm:text-base text-gray-700 space-y-2">
+                <li>Guru meminta murid mengambil laptop di rak besi.</li>
+                <li>Pastikan murid mencabut wayar "charger" dengan tertib sebelum mengambil keluar laptop.</li>
+                <li>Buka laptop dan masukkan password: <strong class="font-bold text-red-600">123456</strong>. Jika perlu, murid boleh menggunakan "Mouse" yang ada di dalam meja.</li>
+                <li>Setelah selesai guna, guru perlu memastikan murid mengembalikan laptop di rak besi (charge semula sekiranya murid mampu).</li>
+                <li>Kegagalan berbuat demikian akan membatalkan tempahan guru pada masa akan datang. Terima kasih.</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- === 5. ADMIN MODAL === -->
+    <div id="admin-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style="display: none;">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-5 sm:p-8">
+            
+            <!-- Login View -->
+            <div id="login-view">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Log Masuk Admin</h2>
+                <div class="mb-4">
+                    <label for="admin-password" class="block text-sm font-medium text-gray-700 mb-1">Kata Laluan</label>
+                    <input type="password" id="admin-password" class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <p id="login-error" class="text-red-500 text-sm mb-4" style="display: none;">Kata laluan salah.</p>
+                <div class="flex justify-end gap-3">
+                    <button id="admin-cancel-btn" class="bg-gray-300 text-gray-800 px-5 py-2 rounded-lg hover:bg-gray-400 transition">Batal</button>
+                    <button id="admin-submit-btn" class="bg-blue-600 text-white px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition">Log Masuk</button>
+                </div>
+            </div>
+
+            <!-- Admin Panel View -->
+            <div id="admin-panel-view" style="display: none;">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Panel Admin</h2>
+                
+                <!-- Edit Dropdown Options -->
+                <div class="mb-6 p-4 border border-gray-300 rounded-lg bg-gray-50">
+                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Edit Pilihan Dropdown</h3>
+                    <p class="text-sm text-gray-600 mb-3">Masukkan pilihan dipisahkan dengan koma (cth: 1A,1B,1C)</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="edit-class-options" class="block text-sm font-medium text-gray-700 mb-1">Pilihan Kelas</label>
+                            <textarea id="edit-class-options" rows="4" class="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                        </div>
+                        <div>
+                            <label for="edit-subject-options" class="block text-sm font-medium text-gray-700 mb-1">Pilihan Subjek</label>
+                            <textarea id="edit-subject-options" rows="4" class="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                        </div>
+                    </div>
+                    <button id="save-options-btn" class="mt-4 bg-blue-600 text-white px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition">Simpan Pilihan</button>
+                </div>
+
+                <!-- Admin Actions -->
+                <div class="mb-6 p-4 border border-gray-300 rounded-lg bg-gray-50">
+                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Tindakan Admin</h3>
+                    
+                    <div class="flex flex-wrap gap-3 mb-4">
+                        <button id="save-schedule-btn" class="bg-blue-500 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-600 transition">Simpan Jadual</button>
+                        <button id="print-schedule-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700 transition">Cetak Jadual</button>
+                        <button id="download-csv-btn" class="bg-green-500 text-white px-4 py-2 rounded-lg shadow hover:bg-green-600 transition">Muat Turun CSV</button>
+                        <button id="download-excel-btn" class="bg-green-700 text-white px-4 py-2 rounded-lg shadow hover:bg-green-800 transition">Muat Turun Excel</button>
+                    </div>
+                    
+                    <div class="flex flex-wrap gap-3 border-t pt-4">
+                        <button id="admin-clear-btn" class="bg-red-600 text-white px-5 py-2 rounded-lg shadow hover:bg-red-700 transition">Kosongkan Jadual Minggu Ini</button>
+                        <button id="admin-rollover-btn" class="bg-purple-600 text-white px-5 py-2 rounded-lg shadow hover:bg-purple-700 transition">Simpan & Mulakan Minggu Baru (Manual)</button>
+                    </div>
+                    <div class="mt-4">
+                        <label for="manual-date-input" class="block text-sm font-medium text-gray-700 mb-1">Tukar Tarikh Mula Minggu Semasa (Isnin)</label>
+                        <input type="date" id="manual-date-input" class="p-2 border border-gray-300 rounded-lg shadow-sm">
+                        <button id="manual-date-btn" class="ml-2 bg-gray-600 text-white px-5 py-2 rounded-lg shadow hover:bg-gray-700 transition">Tetapkan Tarikh</button>
+                    </div>
+                </div>
+                
+                <!-- Weekly Archive -->
+                <div class="mb-6 p-4 border border-gray-300 rounded-lg bg-gray-50">
+                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Arkib Mingguan</h3>
+                    <div id="archive-list" class="max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-3 space-y-2">
+                        <p class="text-gray-500">Tiada arkib ditemui.</p>
+                    </div>
+                </div>
+
+                <div class="flex justify-end">
+                    <button id="admin-close-btn" class="bg-gray-300 text-gray-800 px-5 py-2 rounded-lg hover:bg-gray-400 transition">Tutup</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- === 6. TOAST NOTIFICATION === -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-green-600 text-white px-6 py-3 rounded-lg shadow-xl transition-transform transform translate-x-full"
+         style="display: none; transition: transform 0.3s ease-in-out;">
+    </div>
+
+    <!-- === 7. JAVASCRIPT === -->
+    <script type="module">
+        // --- Import Plugins ---
+        dayjs.extend(dayjs_plugin_isoWeek);
+        dayjs.extend(dayjs_plugin_customParseFormat);
+
+        // === 1. KONFIGURASI & PEMALAR ===
+        const PERIODS_COUNT = 12;
+        const PERIOD_TIMES = [
+            "7.45-8.15", "8.15-8.45", "8.45-9.15", "9.15-9.40", "9.40-10.10", 
+            "10.10-10.40", "10.40-11.10", "11.10-11.40", "11.40-12.10", 
+            "12.10-12.40", "12.40-1.10", "1.10-1.40"
         ];
-        csvContent += row.join(",") + "\r\n";
-      });
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", "rekod_pinjaman_ict.csv");
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-  };
+        const DAYS_MAP = {
+            'mo': { name: 'Monday', label: 'Mo', bg: 'bg-yellow-300 day-mo' },
+            'tu': { name: 'Tuesday', label: 'Tu', bg: 'bg-green-300 day-tu' },
+            'we': { name: 'Wednesday', label: 'We', bg: 'bg-blue-300 day-we' },
+            'th': { name: 'Thursday', label: 'Th', bg: 'bg-orange-300 day-th' },
+            'fr': { name: 'Friday', label: 'Fr', bg: 'bg-pink-300 day-fr' },
+        };
+        
+        let CLASS_OPTIONS = [
+            '', '1B', '1C', '2B', '2C', '3B', '3C', '4B', '4C', '5B', '5C', '6B', '6C', 'Other'
+        ];
+        let SUBJECT_OPTIONS = [
+            '', 'SJ', 'MT', 'BM', 'BI', 'RBT', 'TMK', 'PI', 'PJPK', 'PSV', 'MZ', 'Other'
+        ];
+        const CLASS_COLORS = {
+            '1B': '#fed7d7', '1C': '#feebc8', '2B': '#fefcbf', '2C': '#c6f6d5', 
+            '3B': '#bee3f8', '3C': '#c3dafe', '4B': '#e9d8fd', '4C': '#fbb6ce', 
+            '5B': '#fed7d7', '5C': '#feebc8', '6B': '#fefcbf', '6C': '#c6f6d5', 
+            'Other': '#e2e8f0',
+        };
+        const SUBJECT_COLORS = {
+            'SJ': '#fbcfe8', 'MT': '#fde68a', 'BM': '#bbf7d0', 'BI': '#bae6fd', 
+            'RBT': '#a5b4fc', 'TMK': '#d8b4fe', 'PI': '#6ee7b7', 'PJPK': '#fda4af', 
+            'PSV': '#fca5a5', 'MZ': '#fdba74', 'Other': '#e2e8f0',
+        };
+        const DEFAULT_BG = '#FFFFFF';
 
-  // --- Logik Paparan (Render Logic) ---
+        const CURRENT_SCHEDULE_KEY = 'sk_sri_aman_schedule_v2';
+        const ARCHIVE_SCHEDULE_KEY = 'sk_sri_aman_schedule_archive';
+        const CURRENT_WEEK_START_KEY = 'sk_sri_aman_current_week_start';
+        const CLASS_OPTIONS_KEY = 'sk_sri_aman_class_options';
+        const SUBJECT_OPTIONS_KEY = 'sk_sri_aman_subject_options';
+        const ADMIN_PASS = 'admin123';
 
-  const renderView = () => {
-    // ... (Kod dikekalkan seperti asal) ...
-    if (loadingAuth) {
-      return <Spinner />;
-    }
-    switch (currentView) {
-      case 'permohonan':
-        return <TeacherPage assets={assets} loadingAssets={loadingAssets} onSubmitSuccess={handleLoanSubmitSuccess} />;
-      case 'adminLogin':
-        return <AdminLoginPage setCurrentView={setCurrentView} />;
-      case 'adminDashboard':
-        if (!user) return <AdminLoginPage setCurrentView={setCurrentView} />;
-        return <AdminDashboardPage 
-                  assets={assets}
-                  loans={loans}
-                  loadingAssets={loadingAssets}
-                  loadingLoans={loadingLoans}
-                  handlers={adminHandlers}
-                />;
-      default:
-        return <TeacherPage assets={assets} loadingAssets={loadingAssets} onSubmitSuccess={handleLoanSubmitSuccess} />;
-    }
-  };
-  
-  return (
-    <div className="bg-gray-100 min-h-screen font-sans">
-      {/* Navbar Utama */}
-      <nav className="bg-blue-700 text-white shadow-md">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex-shrink-0 flex items-center">
-              {/* [DIKEMAS KINI] Tajuk projek */}
-              <span className="text-xl font-bold">Sistem Pinjaman Aset ICT (SK Sri Aman)</span>
-            </div>
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setCurrentView('permohonan')}
-                className={`px-3 py-2 rounded-md text-sm font-medium ${currentView === 'permohonan' ? 'bg-blue-800' : 'hover:bg-blue-600'}`}
-              >
-                Permohonan Pinjaman
-              </button>
-              
-              {user ? (
-                <>
-                  <button
-                    onClick={() => setCurrentView('adminDashboard')}
-                    className={`px-3 py-2 rounded-md text-sm font-medium ${currentView === 'adminDashboard' ? 'bg-blue-800' : 'hover:bg-blue-600'}`}
-                  >
-                    Dashboard Admin
-                  </button>
-                  <button
-                    onClick={handleLogout}
-                    className="px-3 py-2 rounded-md text-sm font-medium bg-red-600 hover:bg-red-700"
-                  >
-                    Log Keluar
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => setCurrentView('adminLogin')}
-                  className={`px-3 py-2 rounded-md text-sm font-medium ${currentView === 'adminLogin' ? 'bg-blue-800' : 'hover:bg-blue-600'}`}
-                >
-                  Log Masuk Admin
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </nav>
+        let currentSchedule = {};
+        let weeklyArchive = [];
+        let currentWeekStart;
+        let autoSaveTimer;
+        let archiveViewIndex = -1;
 
-      {/* Kandungan Utama */}
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md mb-4" role="alert">
-            <strong className="font-bold">Ralat:</strong>
-            <span className="block sm:inline"> {error}</span>
-            <button onClick={() => setError(null)} className="float-right font-bold text-lg">&times;</button>
-          </div>
-        )}
-        {renderView()}
-      </main>
+        const tableHeader = document.querySelector("#schedule-table thead tr");
+        const tableBody = document.getElementById("schedule-body");
+        const weekDateDisplay = document.getElementById("week-date-display");
+        const loadingOverlay = document.getElementById("loading-overlay");
+        const toast = document.getElementById("toast");
+        
+        const adminModal = document.getElementById("admin-modal");
+        const adminLoginBtn = document.getElementById("admin-login-btn");
+        const adminCancelBtn = document.getElementById("admin-cancel-btn");
+        const adminSubmitBtn = document.getElementById("admin-submit-btn");
+        const adminCloseBtn = document.getElementById("admin-close-btn");
+        const loginView = document.getElementById("login-view");
+        const adminPanelView = document.getElementById("admin-panel-view");
+        const adminPassword = document.getElementById("admin-password");
+        const loginError = document.getElementById("login-error");
+        
+        const saveBtn = document.getElementById("save-schedule-btn");
+        const printBtn = document.getElementById("print-schedule-btn");
+        const csvBtn = document.getElementById("download-csv-btn");
+        const excelBtn = document.getElementById("download-excel-btn");
+        const adminClearBtn = document.getElementById("admin-clear-btn");
+        const adminRolloverBtn = document.getElementById("admin-rollover-btn");
+        const manualDateInput = document.getElementById("manual-date-input");
+        const manualDateBtn = document.getElementById("manual-date-btn");
+        const archiveListContainer = document.getElementById("archive-list");
+        const editClassOptions = document.getElementById("edit-class-options");
+        const editSubjectOptions = document.getElementById("edit-subject-options");
+        const saveOptionsBtn = document.getElementById("save-options-btn");
 
-      {/* Modal Kejayaan */}
-      <Modal 
-        isOpen={successModalOpen} 
-        onClose={() => setSuccessModalOpen(false)}
-        title="Permohonan Dihantar"
-      >
-        <p>✅ Permohonan anda telah berjaya dihantar. Sila tunggu kelulusan daripada pihak admin.</p>
-      </Modal>
-    </div>
-  );
-}
+        const archiveStatus = document.getElementById("archive-status");
+        const archivePrevBtn = document.getElementById("archive-prev");
+        const archiveNextBtn = document.getElementById("archive-next");
+        
+        const printTable = document.getElementById("print-table");
 
-export default App;
+        function loadCurrentWeekStart() {
+            if (!currentWeekStart) {
+                const savedDate = localStorage.getItem(CURRENT_WEEK_START_KEY);
+                let dateToUse = savedDate ? dayjs(savedDate) : dayjs("2025-11-03");
+                if (dateToUse.day() !== 1) {
+                    dateToUse = dateToUse.isoWeekday(1);
+                }
+                currentWeekStart = dateToUse;
+            }
+        }
 
+        async function init() {
+            showLoading("Memuatkan data...");
+            loadOptionsFromStorage();
+            initTableStructure();
+            loadArchiveFromStorage();
+            loadCurrentWeekStart();
+            await checkWeeklyRollover();
+            loadScheduleFromStorage();
+            renderWeekDate();
+            renderSchedule(currentSchedule, false);
+            initEventListeners();
+            initAdminPanel();
+            updateArchiveNav();
+            hideLoading();
+        }
+
+        function initTableStructure() {
+            PERIOD_TIMES.forEach((time, index) => {
+                const th = document.createElement("th");
+                th.className = "p-2 text-xs font-semibold border-2 border-black tracking-wider bg-teal-600";
+                th.innerHTML = `<div class="font-bold text-white">W${index + 1}</div><div class="font-normal text-teal-100">${time}</div>`;
+                tableHeader.appendChild(th);
+            });
+
+            Object.keys(DAYS_MAP).forEach(dayKey => {
+                const day = DAYS_MAP[dayKey];
+                const tr = document.createElement("tr");
+                tr.className = `${day.bg}`;
+                
+                const th = document.createElement("th");
+                th.className = `p-2 text-lg sm:text-xl font-bold border-2 border-black text-gray-800 print-day-header`;
+                th.textContent = day.label;
+                tr.appendChild(th);
+
+                for (let i = 1; i <= PERIODS_COUNT; i++) {
+                    const td = document.createElement("td");
+                    td.className = "p-1 h-20 border-2 border-black bg-white";
+                    td.dataset.day = dayKey;
+                    td.dataset.period = i;
+
+                    const classSelect = createDropdown('class', dayKey, i);
+                    const subjectSelect = createDropdown('subject', dayKey, i);
+                    
+                    const printValueClass = document.createElement("span");
+                    printValueClass.className = "print-value print-class-value";
+                    const printValueSubject = document.createElement("span");
+                    printValueSubject.className = "print-value print-subject-value";
+
+                    td.appendChild(classSelect);
+                    td.appendChild(subjectSelect);
+                    td.appendChild(printValueClass);
+                    td.appendChild(printValueSubject);
+                    tr.appendChild(td);
+                }
+                tableBody.appendChild(tr);
+            });
+        }
+        
+        function createDropdown(type, day, period) {
+            const select = document.createElement("select");
+            select.className = "w-full p-1 border-0 rounded-md shadow-sm focus:ring-1 focus:ring-blue-500 transition-all duration-200 mb-1";
+            select.dataset.type = type;
+            select.dataset.day = day;
+            select.dataset.period = period;
+
+            const options = (type === 'class') ? CLASS_OPTIONS : SUBJECT_OPTIONS;
+            const colors = (type === 'class') ? CLASS_COLORS : SUBJECT_COLORS;
+
+            options.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt;
+                option.textContent = opt;
+                if (opt && colors[opt]) {
+                    option.style.backgroundColor = colors[opt];
+                } else if (!opt) {
+                    option.style.backgroundColor = DEFAULT_BG;
+                }
+                select.appendChild(option);
+            });
+            return select;
+        }
+
+        function renderWeekDate() {
+            if (!currentWeekStart) {
+                loadCurrentWeekStart();
+            }
+            const startDate = currentWeekStart.format("D");
+            const endDate = currentWeekStart.add(4, 'day').format("D MMM YYYY").toUpperCase();
+            weekDateDisplay.textContent = `TARIKH: ${startDate} - ${endDate}`;
+        }
+
+        function loadOptionsFromStorage() {
+            const savedClassOpts = localStorage.getItem(CLASS_OPTIONS_KEY);
+            const savedSubjectOpts = localStorage.getItem(SUBJECT_OPTIONS_KEY);
+            
+            if (savedClassOpts) {
+                CLASS_OPTIONS = savedClassOpts.split(',').map(s => s.trim());
+            } else {
+                localStorage.setItem(CLASS_OPTIONS_KEY, CLASS_OPTIONS.join(','));
+            }
+
+            if (savedSubjectOpts) {
+                SUBJECT_OPTIONS = savedSubjectOpts.split(',').map(s => s.trim());
+            } else {
+                localStorage.setItem(SUBJECT_OPTIONS_KEY, SUBJECT_OPTIONS.join(','));
+            }
+            
+            if (CLASS_OPTIONS[0] !== '') CLASS_OPTIONS.unshift('');
+            if (SUBJECT_OPTIONS[0] !== '') SUBJECT_OPTIONS.unshift('');
+        }
+        
+        function saveOptionsToStorage() {
+            let classOpts = editClassOptions.value.split(',').map(s => s.trim()).filter(Boolean);
+            let subjectOpts = editSubjectOptions.value.split(',').map(s => s.trim()).filter(Boolean);
+
+            classOpts.unshift('');
+            subjectOpts.unshift('');
+            
+            CLASS_OPTIONS = classOpts;
+            SUBJECT_OPTIONS = subjectOpts;
+
+            localStorage.setItem(CLASS_OPTIONS_KEY, CLASS_OPTIONS.join(','));
+            localStorage.setItem(SUBJECT_OPTIONS_KEY, SUBJECT_OPTIONS.join(','));
+            
+            showToast("Pilihan dropdown telah disimpan!");
+            
+            showLoading("Menjana semula jadual...");
+            tableHeader.innerHTML = '<th class="w-28 p-2 text-sm font-bold border-2 border-black uppercase">HARI / WAKTU</th>';
+            tableBody.innerHTML = '';
+            initTableStructure();
+            renderSchedule(currentSchedule, false);
+            hideLoading();
+        }
+
+        function createEmptySchedule() {
+            const emptySchedule = {};
+            Object.keys(DAYS_MAP).forEach(dayKey => {
+                emptySchedule[dayKey] = {};
+                for (let i = 1; i <= PERIODS_COUNT; i++) {
+                    emptySchedule[dayKey][i] = { class: '', subject: '' };
+                }
+            });
+            return emptySchedule;
+        }
+
+        function loadScheduleFromStorage() {
+            let data = localStorage.getItem(CURRENT_SCHEDULE_KEY);
+            if (data) {
+                try {
+                    currentSchedule = JSON.parse(data);
+                    currentSchedule = migrateScheduleData(currentSchedule);
+                } catch (e) {
+                    console.error("Gagal memuatkan jadual:", e);
+                    currentSchedule = createEmptySchedule();
+                }
+            } else {
+                currentSchedule = createEmptySchedule();
+            }
+        }
+        
+        function migrateScheduleData(data) {
+            const firstDayKey = Object.keys(DAYS_MAP)[0];
+            const firstCellData = data[firstDayKey] ? data[firstDayKey]['1'] : null;
+
+            if (firstCellData && typeof firstCellData === 'string') {
+                showToast("Mengemas kini format data jadual...");
+                const newSchedule = createEmptySchedule();
+                Object.keys(DAYS_MAP).forEach(dayKey => {
+                    for (let i = 1; i <= PERIODS_COUNT; i++) {
+                        const oldVal = data[dayKey]?.[i] || '';
+                        if (CLASS_OPTIONS.includes(oldVal)) {
+                            newSchedule[dayKey][i] = { class: oldVal, subject: '' };
+                        } else if (SUBJECT_OPTIONS.includes(oldVal)) {
+                            newSchedule[dayKey][i] = { class: '', subject: oldVal };
+                        } else if (oldVal) {
+                             newSchedule[dayKey][i] = { class: 'Other', subject: 'Other' };
+                        } else {
+                            newSchedule[dayKey][i] = { class: '', subject: '' };
+                        }
+                    }
+                });
+                localStorage.setItem(CURRENT_SCHEDULE_KEY, JSON.stringify(newSchedule));
+                return newSchedule;
+            }
+            return data || createEmptySchedule();
+        }
+
+        function saveScheduleToStorage() {
+            localStorage.setItem(CURRENT_SCHEDULE_KEY, JSON.stringify(currentSchedule));
+            showToast("Jadual disimpan!");
+        }
+
+        function loadArchiveFromStorage() {
+            let data = localStorage.getItem(ARCHIVE_SCHEDULE_KEY);
+            if (data) {
+                try {
+                    weeklyArchive = JSON.parse(data);
+                } catch (e) {
+                    console.error("Gagal memuatkan arkib:", e);
+                    weeklyArchive = [];
+                }
+            } else {
+                weeklyArchive = [];
+            }
+            renderArchiveList();
+        }
+
+        function saveArchiveToStorage() {
+            localStorage.setItem(ARCHIVE_SCHEDULE_KEY, JSON.stringify(weeklyArchive));
+            renderArchiveList();
+        }
+
+        function applySelectColor(selectElement) {
+            const value = selectElement.value;
+            const type = selectElement.dataset.type;
+            let color = DEFAULT_BG;
+
+            if (value) {
+                const colors = (type === 'class') ? CLASS_COLORS : SUBJECT_COLORS;
+                color = colors[value] || DEFAULT_BG;
+            }
+            selectElement.style.backgroundColor = color;
+        }
+        
+        function renderSchedule(data, isArchive = false) {
+            if (!data) data = createEmptySchedule();
+            
+            Object.keys(DAYS_MAP).forEach(dayKey => {
+                for (let i = 1; i <= PERIODS_COUNT; i++) {
+                    const cell = tableBody.querySelector(`td[data-day='${dayKey}'][data-period='${i}']`);
+                    if (cell) {
+                        const classSelect = cell.querySelector(`select[data-type='class']`);
+                        const subjectSelect = cell.querySelector(`select[data-type='subject']`);
+                        const printClassVal = cell.querySelector('.print-class-value');
+                        const printSubjectVal = cell.querySelector('.print-subject-value');
+
+                        let cellData = data[dayKey] ? data[dayKey][i] : null;
+
+                        if (typeof cellData === 'string') {
+                            if (CLASS_OPTIONS.includes(cellData)) {
+                                cellData = { class: cellData, subject: '' };
+                            } else if (SUBJECT_OPTIONS.includes(cellData)) {
+                                cellData = { class: '', subject: cellData };
+                            } else {
+                                cellData = { class: '', subject: '' };
+                            }
+                        } else if (!cellData || typeof cellData.class === 'undefined') {
+                            cellData = { class: '', subject: '' };
+                        }
+
+                        classSelect.value = cellData.class || '';
+                        subjectSelect.value = cellData.subject || '';
+                        
+                        printClassVal.textContent = cellData.class || '';
+                        printSubjectVal.textContent = cellData.subject || '';
+
+                        applySelectColor(classSelect);
+                        applySelectColor(subjectSelect);
+
+                        classSelect.disabled = isArchive;
+                        subjectSelect.disabled = isArchive;
+                    }
+                }
+            });
+        }
+
+        function updateScheduleDataFromTable() {
+            const newSchedule = createEmptySchedule();
+            Object.keys(DAYS_MAP).forEach(dayKey => {
+                for (let i = 1; i <= PERIODS_COUNT; i++) {
+                    const cell = tableBody.querySelector(`td[data-day='${dayKey}'][data-period='${i}']`);
+                    if (cell) {
+                        const classVal = cell.querySelector(`select[data-type='class']`).value;
+                        const subjectVal = cell.querySelector(`select[data-type='subject']`).value;
+                        newSchedule[dayKey][i] = { class: classVal, subject: subjectVal };
+                    }
+                }
+            });
+            currentSchedule = newSchedule;
+        }
+        
+        function showToast(message, isError = false) {
+            toast.textContent = message;
+            toast.className = `fixed bottom-5 right-5 px-6 py-3 rounded-lg shadow-xl transition-transform transform ${isError ? 'bg-red-600' : 'bg-green-600'} text-white`;
+            toast.style.display = 'block';
+            toast.style.transform = 'translateX(0)';
+            
+            setTimeout(() => {
+                toast.style.transform = 'translateX(120%)';
+            }, 3000);
+        }
+
+        function showLoading(message) {
+            loadingOverlay.querySelector('span').textContent = message || "Memuatkan...";
+            loadingOverlay.style.display = 'flex';
+        }
+        function hideLoading() {
+            loadingOverlay.style.display = 'none';
+        }
+
+        function initEventListeners() {
+            tableBody.addEventListener("change", (event) => {
+                if (event.target && event.target.tagName === 'SELECT') {
+                    applySelectColor(event.target);
+                    clearTimeout(autoSaveTimer);
+                    updateScheduleDataFromTable();
+                    autoSaveTimer = setTimeout(() => {
+                        saveScheduleToStorage();
+                    }, 500);
+                }
+            });
+
+            adminLoginBtn.addEventListener("click", openAdminModal);
+            adminCancelBtn.addEventListener("click", closeAdminModal);
+            adminCloseBtn.addEventListener("click", closeAdminModal);
+            adminSubmitBtn.addEventListener("click", handleAdminLogin);
+            
+            archivePrevBtn.addEventListener("click", () => navigateArchive(-1));
+            archiveNextBtn.addEventListener("click", () => navigateArchive(1));
+        }
+        
+        function initAdminPanel() {
+            saveBtn.addEventListener("click", () => {
+                updateScheduleDataFromTable();
+                saveScheduleToStorage();
+            });
+            printBtn.addEventListener("click", printSchedule);
+            csvBtn.addEventListener("click", exportCSV);
+            excelBtn.addEventListener("click", exportXLSX);
+            
+            adminClearBtn.addEventListener("click", () => {
+                if (confirm("Anda pasti mahu kosongkan semua data jadual minggu ini? Tindakan ini tidak boleh diundur.")) {
+                    currentSchedule = createEmptySchedule();
+                    saveScheduleToStorage();
+                    renderSchedule(currentSchedule, false);
+                    showToast("Jadual minggu ini telah dikosongkan.", true);
+                }
+            });
+            
+            adminRolloverBtn.addEventListener("click", () => {
+                if (confirm("Anda pasti mahu simpan jadual ini ke arkib dan mulakan minggu baru?")) {
+                    handleRollover(true);
+                }
+            });
+            
+            manualDateBtn.addEventListener("click", () => {
+                const newDate = manualDateInput.value;
+                if (newDate) {
+                    let newStartDate = dayjs(newDate);
+                    if (newStartDate.day() !== 1) {
+                        newStartDate = newStartDate.isoWeekday(1);
+                        alert("Tarikh telah ditetapkan ke hari Isnin minggu tersebut.");
+                    }
+                    currentWeekStart = newStartDate;
+                    localStorage.setItem(CURRENT_WEEK_START_KEY, currentWeekStart.format("YYYY-MM-DD"));
+                    renderWeekDate();
+                    showToast("Tarikh minggu semasa telah ditukar.");
+                    closeAdminModal();
+                }
+            });
+            
+            initDropdownEditors();
+            saveOptionsBtn.addEventListener("click", () => {
+                if (confirm("Menyimpan pilihan baru akan menjana semula jadual. Anda pasti?")) {
+                    saveOptionsToStorage();
+                }
+            });
+        }
+        
+        function initDropdownEditors() {
+            editClassOptions.value = CLASS_OPTIONS.filter(opt => opt !== '').join(',');
+            editSubjectOptions.value = SUBJECT_OPTIONS.filter(opt => opt !== '').join(',');
+        }
+
+        function openAdminModal() {
+            adminModal.style.display = 'flex';
+            adminPassword.value = '';
+            loginError.style.display = 'none';
+            loginView.style.display = 'block';
+            adminPanelView.style.display = 'none';
+            adminPassword.focus();
+        }
+        function closeAdminModal() {
+            adminModal.style.display = 'none';
+        }
+
+        function handleAdminLogin() {
+            if (adminPassword.value === ADMIN_PASS) {
+                loginView.style.display = 'none';
+                adminPanelView.style.display = 'block';
+                loadArchiveFromStorage();
+                initDropdownEditors();
+            } else {
+                loginError.style.display = 'block';
+            }
+        }
+        
+        async function checkWeeklyRollover() {
+            const today = dayjs();
+            if (today.day() === 0) { 
+                const lastRollover = localStorage.getItem('last_rollover_date');
+                const lastRolloverDate = lastRollover ? dayjs(lastRollover) : dayjs().subtract(10, 'days');
+                const thisSunday = today;
+                
+                if (!currentWeekStart) {
+                    loadCurrentWeekStart();
+                }
+
+                if (lastRolloverDate.isBefore(thisSunday, 'day')) {
+                    if (currentWeekStart.isBefore(today, 'day')) {
+                        showLoading("Memulakan minggu baru...");
+                        await handleRollover(false);
+                        localStorage.setItem('last_rollover_date', thisSunday.format('YYYY-MM-DD'));
+                        showToast("Minggu baru telah dimulakan!");
+                        hideLoading();
+                    }
+                }
+            }
+            return Promise.resolve();
+        }
+
+        function handleRollover(isManual) {
+            return new Promise((resolve) => {
+                if (!currentWeekStart) {
+                    loadCurrentWeekStart();
+                }
+                
+                const startDate = currentWeekStart.format("D MMM");
+                const endDate = currentWeekStart.add(4, 'day').format("D MMM YYYY");
+                const archiveLabel = `Minggu ${startDate} - ${endDate}`;
+                
+                const archiveEntry = {
+                    id: new Date().toISOString(),
+                    label: archiveLabel,
+                    startDate: currentWeekStart.format("YYYY-MM-DD"),
+                    schedule: JSON.parse(JSON.stringify(currentSchedule))
+                };
+                
+                weeklyArchive.unshift(archiveEntry);
+                saveArchiveToStorage();
+                
+                currentSchedule = createEmptySchedule();
+                saveScheduleToStorage();
+                
+                currentWeekStart = currentWeekStart.add(7, 'days');
+                localStorage.setItem(CURRENT_WEEK_START_KEY, currentWeekStart.format("YYYY-MM-DD"));
+                
+                if (isManual) {
+                    renderWeekDate();
+                    renderSchedule(currentSchedule, false);
+                    showToast("Jadual telah diarkib & minggu baru dimulakan!");
+                    closeAdminModal();
+                }
+                resolve();
+            });
+        }
+        
+        function renderArchiveList() {
+            if (weeklyArchive.length === 0) {
+                archiveListContainer.innerHTML = '<p class="text-gray-500">Tiada arkib ditemui.</p>';
+                return;
+            }
+            
+            archiveListContainer.innerHTML = '';
+            weeklyArchive.forEach((entry, index) => {
+                const div = document.createElement("div");
+                div.className = "flex justify-between items-center p-2 rounded-lg hover:bg-gray-100";
+                
+                const label = document.createElement("span");
+                label.textContent = entry.label;
+                label.className = "font-medium text-gray-700";
+                div.appendChild(label);
+                
+                const btnGroup = document.createElement("div");
+                btnGroup.className = "flex gap-2";
+
+                const viewBtn = document.createElement("button");
+                viewBtn.textContent = "Lihat";
+                viewBtn.className = "text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600";
+                viewBtn.onclick = () => viewArchiveWeek(index);
+                btnGroup.appendChild(viewBtn);
+
+                const deleteBtn = document.createElement("button");
+                deleteBtn.textContent = "Padam";
+                deleteBtn.className = "text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600";
+                deleteBtn.onclick = () => deleteArchiveEntry(index);
+                btnGroup.appendChild(deleteBtn);
+                
+                div.appendChild(btnGroup);
+                archiveListContainer.appendChild(div);
+            });
+        }
+        
+        function deleteArchiveEntry(index) {
+            if (confirm(`Anda pasti mahu padam arkib "${weeklyArchive[index].label}"?`)) {
+                weeklyArchive.splice(index, 1);
+                saveArchiveToStorage();
+                showToast("Arkib telah dipadam.", true);
+            }
+        }
+        
+        function viewArchiveWeek(index) {
+            archiveViewIndex = index;
+            const entry = weeklyArchive[index];
+            renderSchedule(entry.schedule, true);
+            
+            const startDate = dayjs(entry.startDate).format("D");
+            const endDate = dayjs(entry.startDate).add(4, 'day').format("D MMM YYYY").toUpperCase();
+            weekDateDisplay.textContent = `ARKIB: ${startDate} - ${endDate}`;
+            
+            updateArchiveNav();
+            closeAdminModal();
+        }
+        
+        function navigateArchive(direction) {
+            let newIndex = archiveViewIndex + direction;
+            
+            if (newIndex > weeklyArchive.length - 1) {
+                newIndex = weeklyArchive.length - 1;
+            }
+            
+            if (newIndex < -1) {
+                newIndex = -1;
+            }
+            
+            if (newIndex === archiveViewIndex) return;
+
+            archiveViewIndex = newIndex;
+            
+            if (archiveViewIndex === -1) {
+                renderSchedule(currentSchedule, false);
+                renderWeekDate();
+            } else {
+                const entry = weeklyArchive[archiveViewIndex];
+                renderSchedule(entry.schedule, true);
+                
+                const startDate = dayjs(entry.startDate).format("D");
+                const endDate = dayjs(entry.startDate).add(4, 'day').format("D MMM YYYY").toUpperCase();
+                weekDateDisplay.textContent = `ARKIB: ${startDate} - ${endDate}`;
+            }
+            updateArchiveNav();
+        }
+        
+        function updateArchiveNav() {
+            if (archiveViewIndex <= -1) {
+                archiveNextBtn.disabled = true;
+                archiveNextBtn.classList.add("opacity-50", "cursor-not-allowed");
+            } else {
+                archiveNextBtn.disabled = false;
+                archiveNextBtn.classList.remove("opacity-50", "cursor-not-allowed");
+            }
+            
+            if (archiveViewIndex >= weeklyArchive.length - 1) {
+                archivePrevBtn.disabled = true;
+                archivePrevBtn.classList.add("opacity-50", "cursor-not-allowed");
+            } else {
+                archivePrevBtn.disabled = false;
+                archivePrevBtn.classList.remove("opacity-50", "cursor-not-allowed");
+            }
+            
+            if (archiveViewIndex === -1) {
+                archiveStatus.textContent = "Minggu Semasa";
+            } else if (weeklyArchive[archiveViewIndex]) {
+                archiveStatus.textContent = weeklyArchive[archiveViewIndex].label;
+            } else {
+                archiveStatus.textContent = "Minggu Semasa";
+                archiveViewIndex = -1;
+            }
+        }
+
+        function getDisplayedScheduleData() {
+            if (archiveViewIndex === -1) {
+                return currentSchedule;
+            } else {
+                return weeklyArchive[archiveViewIndex].schedule;
+            }
+        }
+
+        function exportCSV() {
+            const data = getDisplayedScheduleData();
+            if (!data) {
+                showToast("Tiada data untuk dieksport.", true);
+                return;
+            }
+            let csvContent = "data:text/csv;charset=utf-8,";
+            
+            csvContent += "Hari/Waktu," + PERIOD_TIMES.map((time, i) => `W${i+1} (${time})`).join(",") + "\r\n";
+            
+            Object.keys(DAYS_MAP).forEach(dayKey => {
+                const dayLabel = DAYS_MAP[dayKey].label;
+                let row = [dayLabel];
+                for (let i = 1; i <= PERIODS_COUNT; i++) {
+                    const cellData = data[dayKey]?.[i] || { class: '', subject: '' };
+                    const cellValue = `${cellData.class || ''} / ${cellData.subject || ''}`;
+                    row.push(`"${cellValue.replace(/"/g, '""')}"`);
+                }
+                csvContent += row.join(",") + "\r\n";
+            });
+            
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `jadual_makmal_${dayjs().format("YYYYMMDD")}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast("CSV dimuat turun!");
+        }
+        
+        function exportXLSX() {
+            const data = getDisplayedScheduleData();
+            if (!data) {
+                showToast("Tiada data untuk dieksport.", true);
+                return;
+            }
+            const wb = XLSX.utils.book_new();
+            
+            const ws_data = [];
+            
+            const header = ["Hari/Waktu"];
+            PERIOD_TIMES.forEach((time, i) => {
+                header.push(`W${i+1} (${time})`);
+            });
+            ws_data.push(header);
+            
+            Object.keys(DAYS_MAP).forEach(dayKey => {
+                const dayLabel = DAYS_MAP[dayKey].label;
+                const row = [dayLabel];
+                for (let i = 1; i <= PERIODS_COUNT; i++) {
+                    const cellData = data[dayKey]?.[i] || { class: '', subject: '' };
+                    const cellValue = `${cellData.class || ''}\n${cellData.subject || ''}`.trim();
+                    row.push(cellValue);
+                }
+                ws_data.push(row);
+            });
+            
+            const ws = XLSX.utils.aoa_to_sheet(ws_data);
+            
+            const cols = [{ wch: 15 }];
+            for (let i = 1; i <= PERIODS_COUNT; i++) {
+                cols.push({ wch: 15 });
+            }
+            ws['!cols'] = cols;
+            
+            XLSX.utils.book_append_sheet(wb, ws, "Jadual Makmal");
+            XLSX.writeFile(wb, `jadual_makmal_${dayjs().format("YYYYMMDD")}.xlsx`);
+            showToast("Excel dimuat turun!");
+        }
+
+        function printSchedule() {
+            printTable.innerHTML = '';
+            const mainTable = document.getElementById('schedule-table');
+            const printHead = mainTable.querySelector('thead').cloneNode(true);
+            const printBody = mainTable.querySelector('tbody').cloneNode(true);
+            printTable.appendChild(printHead);
+            printTable.appendChild(printBody);
+            window.print();
+        }
+
+        init();
+    </script>
+
+</body>
+</html>

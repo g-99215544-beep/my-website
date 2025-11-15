@@ -1,1057 +1,1027 @@
 <!DOCTYPE html>
 <html lang="ms">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jadual Makmal Komputer SK Sri Aman</title>
-    <!-- 1. Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 2. Day.js (untuk pengurusan tarikh) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/dayjs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/plugin/isoWeek.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/plugin/customParseFormat.min.js"></script>
-    <!-- 3. Sheet.js (untuk eksport Excel) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <!-- Google Font: Inter -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jadual Makmal Komputer SK Sri Aman</title>
 
-    <style>
-        /* Sembunyikan 'spinner' pada input nombor */
-        input[type='number']::-webkit-inner-spin-button,
-        input[type='number']::-webkit-outer-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-        input[type='number'] {
-            -moz-appearance: textfield;
-        }
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-        /* Gaya cetak */
-        @media print {
-            body {
-                font-family: 'Inter', Arial, sans-serif;
-            }
-            .no-print {
-                display: none !important;
-            }
-            .print-container {
-                width: 100%;
-                max-width: 100%;
-                box-shadow: none;
-                border: 1px solid #000;
-                margin: 0;
-                padding: 0;
-                border-radius: 0;
-            }
-            .print-table {
-                width: 100%;
-                border-collapse: collapse;
-                table-layout: fixed;
-            }
-            .print-table th, .print-table td {
-                border: 2px solid #000 !important;
-                padding: 4px;
-                font-size: 10px;
-                text-align: center;
-                height: 60px;
-                vertical-align: top;
-                overflow: hidden;
-                word-wrap: break-word;
-            }
-            .print-table select {
-                display: none;
-            }
-            .print-value {
-                display: block !important;
-                font-size: 11px;
-                font-weight: bold;
-            }
-            .print-day-header {
-                font-size: 14px;
-                font-weight: bold;
-                padding: 8px;
-            }
+  <!-- Day.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/dayjs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/plugin/isoWeek.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/plugin/customParseFormat.min.js"></script>
 
-            /* Warna latar belakang untuk cetakan */
-            .day-mo { background-color: #FFFF00 !important; }
-            .day-tu { background-color: #92D050 !important; }
-            .day-we { background-color: #00B0F0 !important; }
-            .day-th { background-color: #FFC000 !important; }
-            .day-fr { background-color: #FF00FF !important; }
+  <!-- Sheet.js untuk eksport Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-        }
+  <!-- Google Font: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-        .print-value {
-            display: none;
-        }
-    </style>
+  <style>
+    input[type='number']::-webkit-inner-spin-button,
+    input[type='number']::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type='number'] {
+      -moz-appearance: textfield;
+    }
+
+    @media print {
+      body {
+        font-family: 'Inter', Arial, sans-serif;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .print-container {
+        width: 100%;
+        max-width: 100%;
+        box-shadow: none;
+        border: 1px solid #000;
+        margin: 0;
+        padding: 0;
+        border-radius: 0;
+      }
+      .print-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+      }
+      .print-table th,
+      .print-table td {
+        border: 2px solid #000 !important;
+        padding: 4px;
+        font-size: 10px;
+        text-align: center;
+        height: 60px;
+        vertical-align: top;
+        word-wrap: break-word;
+      }
+      .print-table select {
+        display: none;
+      }
+      .print-value {
+        display: block !important;
+        font-size: 11px;
+        font-weight: bold;
+      }
+
+      .day-mo { background-color: #FFFF00 !important; }
+      .day-tu { background-color: #92D050 !important; }
+      .day-we { background-color: #00B0F0 !important; }
+      .day-th { background-color: #FFC000 !important; }
+      .day-fr { background-color: #FF00FF !important; }
+
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .print-value {
+      display: none;
+    }
+
+    /* ============================
+       FIX DROPDOWN TERPOTONG (MOBILE)
+       ============================ */
+    @media (max-width: 480px) {
+      td {
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: flex-start;
+        align-items: stretch;
+        height: auto !important;
+        padding: 2px !important;
+      }
+      td select {
+        width: 100% !important;
+        font-size: 13px !important;
+        padding: 6px !important;
+        margin-bottom: 4px !important;
+        padding-right: 20px !important;
+      }
+      .print-value {
+        display: none !important;
+      }
+      tr {
+        height: auto !important;
+      }
+      th {
+        font-size: 12px !important;
+      }
+    }
+  </style>
 </head>
 
 <body class="bg-gray-100 p-4 sm:p-6 md:p-8" style="font-family: 'Inter', sans-serif;">
 
-    <div class="max-w-full mx-auto bg-white rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 print-container">
-        
-        <!-- === 1. HEADER === -->
-        <header class="flex flex-col sm:flex-row items-center justify-between mb-4 sm:mb-6 pb-4 border-b-2 border-gray-200">
-            <div class="flex items-center mb-3 sm:mb-0">
-                <!-- Logo Sekolah -->
-                <img src="https://i.imgur.com/AfsVtVG.jpeg" alt="Logo Sekolah" class="h-16 w-16 sm:h-20 sm:w-20 mr-4 rounded-md border-2 border-gray-300 no-print">
-                <div>
-                    <h1 class="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">
-                        JADUAL MAKMAL KOMPUTER SK SRI AMAN 2025
-                    </h1>
-                    <p id="week-date-display" class="text-base sm:text-lg text-gray-600 font-medium">
-                        TARIKH: 3 - 7 NOVEMBER 2025
-                    </p>
-                </div>
-            </div>
-            <button id="admin-login-btn" class="no-print bg-blue-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-700 transition duration-300 font-medium">
-                Panel Admin
-            </button>
-        </header>
+  <div class="max-w-full mx-auto bg-white rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 print-container">
 
-        <!-- === 2. TOOLBAR (Navigasi Sahaja) === -->
-        <div class="mb-4 flex flex-wrap gap-2 justify-between items-center no-print">
-            <!-- Navigasi Arkib -->
-            <div class="flex items-center gap-2">
-                <button id="archive-prev" class="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-100 transition shadow-sm" title="Minggu Sebelumnya">&lt;</button>
-                <span id="archive-status" class="text-sm font-medium text-gray-700 w-40 text-center">Minggu Semasa</span>
-                <button id="archive-next" class="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-100 transition shadow-sm" title="Minggu Seterusnya">&gt;</button>
-            </div>
+    <!-- HEADER -->
+    <header class="flex flex-col sm:flex-row items-center justify-between mb-4 sm:mb-6 pb-4 border-b-2 border-gray-200">
+      <div class="flex items-center mb-3 sm:mb-0">
+        <img src="https://i.imgur.com/AfsVtVG.jpeg" alt="Logo Sekolah" class="h-16 w-16 sm:h-20 sm:w-20 mr-4 rounded-md border-2 border-gray-300 no-print">
+        <div>
+          <h1 class="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">
+            JADUAL MAKMAL KOMPUTER SK SRI AMAN 2025
+          </h1>
+          <p id="week-date-display" class="text-base sm:text-lg text-gray-600 font-medium">
+            TARIKH: -
+          </p>
         </div>
+      </div>
+      <button id="admin-login-btn" class="no-print bg-blue-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-700 transition duration-300 font-medium">
+        Panel Admin
+      </button>
+    </header>
 
-        <!-- === 3. TABLE CONTAINER === -->
-        <div class="overflow-x-auto w-full relative no-print rounded-xl shadow-inner border border-gray-200">
-            <div id="loading-overlay" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-20 rounded-xl" style="display: none;">
-                <span class="text-xl font-medium text-gray-700">Memuatkan...</span>
-            </div>
-            <table id="schedule-table" class="min-w-full border-2 border-black print-table">
-                <thead class="bg-teal-700 text-teal-50">
-                    <tr>
-                        <th class="w-28 p-2 text-sm font-bold border-2 border-black uppercase">HARI / WAKTU</th>
-                        <!-- Waktu akan dijana oleh JS -->
-                    </tr>
-                </thead>
-                <tbody id="schedule-body">
-                    <!-- Hari akan dijana oleh JS -->
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Paparan Cetak Sahaja -->
-        <div id="print-view" class="hidden">
-            <table id="print-table" class="min-w-full border-2 border-black print-table"></table>
-        </div>
-
-        <!-- === 4. INFO BOX (TATACARA) === -->
-        <div class="mt-6 sm:mt-8 p-4 sm:p-5 bg-yellow-100 border-l-4 border-yellow-500 rounded-lg shadow-md no-print">
-            <h3 class="text-lg sm:text-xl font-bold text-yellow-800 mb-3">TATACARA PENGGUNAAN LAPTOP</h3>
-            <ol class="list-decimal list-inside text-sm sm:text-base text-gray-700 space-y-2">
-                <li>Guru meminta murid mengambil laptop di rak besi.</li>
-                <li>Pastikan murid mencabut wayar "charger" dengan tertib sebelum mengambil keluar laptop.</li>
-                <li>Buka laptop dan masukkan password: <strong class="font-bold text-red-600">123456</strong>. Jika perlu, murid boleh menggunakan "Mouse" yang ada di dalam meja.</li>
-                <li>Setelah selesai guna, guru perlu memastikan murid mengembalikan laptop di rak besi (charge semula sekiranya murid mampu).</li>
-                <li>Kegagalan berbuat demikian akan membatalkan tempahan guru pada masa akan datang. Terima kasih.</li>
-            </ol>
-        </div>
+    <!-- TOOLBAR / NAV -->
+    <div class="mb-4 flex flex-wrap gap-2 justify-between items-center no-print">
+      <div class="flex items-center gap-2">
+        <button id="archive-prev" class="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-100 transition shadow-sm" title="Minggu Sebelumnya">&lt;</button>
+        <span id="archive-status" class="text-sm font-medium text-gray-700 w-40 text-center">Minggu Semasa</span>
+        <button id="archive-next" class="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-100 transition shadow-sm" title="Minggu Seterusnya">&gt;</button>
+      </div>
     </div>
 
-    <!-- === 5. ADMIN MODAL === -->
-    <div id="admin-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style="display: none;">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-5 sm:p-8">
-            
-            <!-- Login View -->
-            <div id="login-view">
-                <h2 class="text-2xl font-bold text-gray-800 mb-6">Log Masuk Admin</h2>
-                <div class="mb-4">
-                    <label for="admin-password" class="block text-sm font-medium text-gray-700 mb-1">Kata Laluan</label>
-                    <input type="password" id="admin-password" class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <p id="login-error" class="text-red-500 text-sm mb-4" style="display: none;">Kata laluan salah.</p>
-                <div class="flex justify-end gap-3">
-                    <button id="admin-cancel-btn" class="bg-gray-300 text-gray-800 px-5 py-2 rounded-lg hover:bg-gray-400 transition">Batal</button>
-                    <button id="admin-submit-btn" class="bg-blue-600 text-white px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition">Log Masuk</button>
-                </div>
-            </div>
+    <!-- TABLE -->
+    <div class="overflow-x-auto w-full relative no-print rounded-xl shadow-inner border border-gray-200">
+      <div id="loading-overlay" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-20 rounded-xl" style="display: none;">
+        <span class="text-xl font-medium text-gray-700">Memuatkan...</span>
+      </div>
+      <table id="schedule-table" class="min-w-full border-2 border-black print-table">
+        <thead class="bg-teal-700 text-teal-50">
+          <tr>
+            <th class="w-28 p-2 text-sm font-bold border-2 border-black uppercase">HARI / WAKTU</th>
+          </tr>
+        </thead>
+        <tbody id="schedule-body"></tbody>
+      </table>
+    </div>
 
-            <!-- Admin Panel View -->
-            <div id="admin-panel-view" style="display: none;">
-                <h2 class="text-2xl font-bold text-gray-800 mb-6">Panel Admin</h2>
-                
-                <!-- Edit Dropdown Options -->
-                <div class="mb-6 p-4 border border-gray-300 rounded-lg bg-gray-50">
-                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Edit Pilihan Dropdown</h3>
-                    <p class="text-sm text-gray-600 mb-3">Masukkan pilihan dipisahkan dengan koma (cth: 1A,1B,1C)</p>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label for="edit-class-options" class="block text-sm font-medium text-gray-700 mb-1">Pilihan Kelas</label>
-                            <textarea id="edit-class-options" rows="4" class="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-                        </div>
-                        <div>
-                            <label for="edit-subject-options" class="block text-sm font-medium text-gray-700 mb-1">Pilihan Subjek</label>
-                            <textarea id="edit-subject-options" rows="4" class="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-                        </div>
-                    </div>
-                    <button id="save-options-btn" class="mt-4 bg-blue-600 text-white px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition">Simpan Pilihan</button>
-                </div>
+    <!-- PRINT-ONLY TABLE (clone) -->
+    <div id="print-view" class="hidden">
+      <table id="print-table" class="min-w-full border-2 border-black print-table"></table>
+    </div>
 
-                <!-- Admin Actions -->
-                <div class="mb-6 p-4 border border-gray-300 rounded-lg bg-gray-50">
-                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Tindakan Admin</h3>
-                    
-                    <div class="flex flex-wrap gap-3 mb-4">
-                        <button id="save-schedule-btn" class="bg-blue-500 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-600 transition">Simpan Jadual</button>
-                        <button id="print-schedule-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700 transition">Cetak Jadual</button>
-                        <button id="download-csv-btn" class="bg-green-500 text-white px-4 py-2 rounded-lg shadow hover:bg-green-600 transition">Muat Turun CSV</button>
-                        <button id="download-excel-btn" class="bg-green-700 text-white px-4 py-2 rounded-lg shadow hover:bg-green-800 transition">Muat Turun Excel</button>
-                    </div>
-                    
-                    <div class="flex flex-wrap gap-3 border-t pt-4">
-                        <button id="admin-clear-btn" class="bg-red-600 text-white px-5 py-2 rounded-lg shadow hover:bg-red-700 transition">Kosongkan Jadual Minggu Ini</button>
-                        <button id="admin-rollover-btn" class="bg-purple-600 text-white px-5 py-2 rounded-lg shadow hover:bg-purple-700 transition">Simpan & Mulakan Minggu Baru (Manual)</button>
-                    </div>
+    <!-- INFO BOX -->
+    <div class="mt-6 sm:mt-8 p-4 sm:p-5 bg-yellow-100 border-l-4 border-yellow-500 rounded-lg shadow-md no-print">
+      <h3 class="text-lg sm:text-xl font-bold text-yellow-800 mb-3">TATACARA PENGGUNAAN LAPTOP</h3>
+      <ol class="list-decimal list-inside text-sm sm:text-base text-gray-700 space-y-2">
+        <li>Guru meminta murid mengambil laptop di rak besi.</li>
+        <li>Pastikan murid mencabut wayar "charger" dengan tertib sebelum mengambil keluar laptop.</li>
+        <li>Buka laptop dan masukkan password: <strong class="font-bold text-red-600">123456</strong>. Jika perlu, murid boleh menggunakan "Mouse" yang ada di dalam meja.</li>
+        <li>Setelah selesai guna, guru perlu memastikan murid mengembalikan laptop di rak besi (charge semula sekiranya murid mampu).</li>
+        <li>Kegagalan berbuat demikian akan membatalkan tempahan guru pada masa akan datang. Terima kasih.</li>
+      </ol>
+    </div>
+  </div>
 
-                    <div class="mt-4 flex flex-wrap gap-2 items-center">
-                        <div>
-                            <label for="manual-date-input" class="block text-sm font-medium text-gray-700 mb-1">Tarikh Mula Minggu Semasa (Isnin)</label>
-                            <input type="date" id="manual-date-input" class="p-2 border border-gray-300 rounded-lg shadow-sm">
-                        </div>
-                        <button id="manual-date-btn" class="self-end bg-gray-600 text-white px-5 py-2 rounded-lg shadow hover:bg-gray-700 transition">Tetapkan Tarikh</button>
-                    </div>
-
-                    <!-- EDIT LABEL MINGGU -->
-                    <div class="mt-4 flex flex-wrap gap-2 items-center">
-                        <div>
-                            <label for="week-label-input" class="block text-sm font-medium text-gray-700 mb-1">Nama / Nombor Minggu</label>
-                            <input type="text" id="week-label-input" placeholder="cth: Minggu 1" class="p-2 border border-gray-300 rounded-lg shadow-sm w-48">
-                        </div>
-                        <button id="week-label-save-btn" class="self-end bg-indigo-600 text-white px-5 py-2 rounded-lg shadow hover:bg-indigo-700 transition">Simpan Label Minggu</button>
-                    </div>
-                </div>
-                
-                <!-- Weekly Archive -->
-                <div class="mb-6 p-4 border border-gray-300 rounded-lg bg-gray-50">
-                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Arkib Mingguan</h3>
-                    <div id="archive-list" class="max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-3 space-y-2">
-                        <p class="text-gray-500">Tiada arkib ditemui.</p>
-                    </div>
-                </div>
-
-                <div class="flex justify-end">
-                    <button id="admin-close-btn" class="bg-gray-300 text-gray-800 px-5 py-2 rounded-lg hover:bg-gray-400 transition">Tutup</button>
-                </div>
-            </div>
+  <!-- ADMIN MODAL -->
+  <div id="admin-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style="display: none;">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-5 sm:p-8">
+      <!-- Login View -->
+      <div id="login-view">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Log Masuk Admin</h2>
+        <div class="mb-4">
+          <label for="admin-password" class="block text-sm font-medium text-gray-700 mb-1">Kata Laluan</label>
+          <input type="password" id="admin-password" class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
         </div>
+        <p id="login-error" class="text-red-500 text-sm mb-4" style="display: none;">Kata laluan salah.</p>
+        <div class="flex justify-end gap-3">
+          <button id="admin-cancel-btn" class="bg-gray-300 text-gray-800 px-5 py-2 rounded-lg hover:bg-gray-400 transition">Batal</button>
+          <button id="admin-submit-btn" class="bg-blue-600 text-white px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition">Log Masuk</button>
+        </div>
+      </div>
+
+      <!-- Admin Panel View -->
+      <div id="admin-panel-view" style="display: none;">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Panel Admin</h2>
+
+        <!-- Edit Dropdown Options -->
+        <div class="mb-6 p-4 border border-gray-300 rounded-lg bg-gray-50">
+          <h3 class="text-xl font-semibold text-gray-700 mb-4">Edit Pilihan Dropdown</h3>
+          <p class="text-sm text-gray-600 mb-3">Masukkan pilihan dipisahkan dengan koma (cth: 1A,1B,1C)</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label for="edit-class-options" class="block text-sm font-medium text-gray-700 mb-1">Pilihan Kelas</label>
+              <textarea id="edit-class-options" rows="4" class="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+            <div>
+              <label for="edit-subject-options" class="block text-sm font-medium text-gray-700 mb-1">Pilihan Subjek</label>
+              <textarea id="edit-subject-options" rows="4" class="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+          </div>
+          <button id="save-options-btn" class="mt-4 bg-blue-600 text-white px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition">Simpan Pilihan</button>
+        </div>
+
+        <!-- Admin Actions -->
+        <div class="mb-6 p-4 border border-gray-300 rounded-lg bg-gray-50">
+          <h3 class="text-xl font-semibold text-gray-700 mb-4">Tindakan Admin</h3>
+
+          <div class="flex flex-wrap gap-3 mb-4">
+            <button id="save-schedule-btn" class="bg-blue-500 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-600 transition">Simpan Jadual</button>
+            <button id="print-schedule-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700 transition">Cetak Jadual</button>
+            <button id="download-csv-btn" class="bg-green-500 text-white px-4 py-2 rounded-lg shadow hover:bg-green-600 transition">Muat Turun CSV</button>
+            <button id="download-excel-btn" class="bg-green-700 text-white px-4 py-2 rounded-lg shadow hover:bg-green-800 transition">Muat Turun Excel</button>
+          </div>
+
+          <div class="flex flex-wrap gap-3 border-t pt-4">
+            <button id="admin-clear-btn" class="bg-red-600 text-white px-5 py-2 rounded-lg shadow hover:bg-red-700 transition">Kosongkan Jadual Minggu Ini</button>
+            <button id="admin-rollover-btn" class="bg-purple-600 text-white px-5 py-2 rounded-lg shadow hover:bg-purple-700 transition">Simpan & Mulakan Minggu Baru (Manual)</button>
+          </div>
+
+          <div class="mt-4">
+            <label for="manual-date-input" class="block text-sm font-medium text-gray-700 mb-1">Tukar Tarikh Mula Minggu Semasa (Isnin)</label>
+            <input type="date" id="manual-date-input" class="p-2 border border-gray-300 rounded-lg shadow-sm">
+            <button id="manual-date-btn" class="ml-2 bg-gray-600 text-white px-5 py-2 rounded-lg shadow hover:bg-gray-700 transition">Tetapkan Tarikh</button>
+          </div>
+
+          <!-- Label Minggu Semasa -->
+          <div class="mt-4">
+            <label for="week-label-input" class="block text-sm font-medium text-gray-700 mb-1">Label Minggu Semasa (cth: M32 / Minggu 2)</label>
+            <input type="text" id="week-label-input" class="p-2 border border-gray-300 rounded-lg shadow-sm w-full md:w-64">
+            <button id="week-label-save-btn" class="ml-0 md:ml-2 mt-2 md:mt-0 bg-indigo-600 text-white px-4 py-2 rounded-lg shadow hover:bg-indigo-700 transition">Simpan Label</button>
+          </div>
+        </div>
+
+        <!-- Weekly Archive -->
+        <div class="mb-6 p-4 border border-gray-300 rounded-lg bg-gray-50">
+          <h3 class="text-xl font-semibold text-gray-700 mb-4">Arkib Mingguan</h3>
+          <div id="archive-list" class="max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-3 space-y-2">
+            <p class="text-gray-500">Tiada arkib ditemui.</p>
+          </div>
+        </div>
+
+        <div class="flex justify-end">
+          <button id="admin-close-btn" class="bg-gray-300 text-gray-800 px-5 py-2 rounded-lg hover:bg-gray-400 transition">Tutup</button>
+        </div>
+      </div>
     </div>
+  </div>
 
-    <!-- === 6. TOAST NOTIFICATION === -->
-    <div id="toast" class="fixed bottom-5 right-5 bg-green-600 text-white px-6 py-3 rounded-lg shadow-xl transition-transform transform translate-x-full"
-         style="display: none; transition: transform 0.3s ease-in-out;">
-    </div>
+  <!-- TOAST -->
+  <div id="toast" class="fixed bottom-5 right-5 bg-green-600 text-white px-6 py-3 rounded-lg shadow-xl transition-transform transform translate-x-full"
+       style="display: none; transition: transform 0.3s ease-in-out;">
+  </div>
 
-    <!-- === 7. JAVASCRIPT === -->
-    <script type="module">
-        // --- Import Plugins ---
-        dayjs.extend(dayjs_plugin_isoWeek);
-        dayjs.extend(dayjs_plugin_customParseFormat);
+  <!-- JAVASCRIPT UTAMA -->
+  <script type="module">
+    import {
+      loadInitialData,
+      saveScheduleToDB,
+      saveArchiveToDB,
+      saveWeekStartToDB,
+      saveWeekLabelToDB,
+      saveOptionsToDB,
+      saveLastRolloverDateToDB
+    } from './database.js';
 
-        // === 1. KONFIGURASI & PEMALAR ===
-        const PERIODS_COUNT = 12;
-        const PERIOD_TIMES = [
-            "7.45-8.15", "8.15-8.45", "8.45-9.15", "9.15-9.40", "9.40-10.10", 
-            "10.10-10.40", "10.40-11.10", "11.10-11.40", "11.40-12.10", 
-            "12.10-12.40", "12.40-1.10", "1.10-1.40"
-        ];
-        const DAYS_MAP = {
-            'mo': { name: 'Monday', label: 'Mo', bg: 'bg-yellow-300 day-mo' },
-            'tu': { name: 'Tuesday', label: 'Tu', bg: 'bg-green-300 day-tu' },
-            'we': { name: 'Wednesday', label: 'We', bg: 'bg-blue-300 day-we' },
-            'th': { name: 'Thursday', label: 'Th', bg: 'bg-orange-300 day-th' },
-            'fr': { name: 'Friday', label: 'Fr', bg: 'bg-pink-300 day-fr' },
-        };
-        
-        let CLASS_OPTIONS = [
-            '', '1B', '1C', '2B', '2C', '3B', '3C', '4B', '4C', '5B', '5C', '6B', '6C', 'Other'
-        ];
-        let SUBJECT_OPTIONS = [
-            '', 'SJ', 'MT', 'BM', 'BI', 'RBT', 'TMK', 'PI', 'PJPK', 'PSV', 'MZ', 'Other'
-        ];
-        const CLASS_COLORS = {
-            '1B': '#fed7d7', '1C': '#feebc8', '2B': '#fefcbf', '2C': '#c6f6d5', 
-            '3B': '#bee3f8', '3C': '#c3dafe', '4B': '#e9d8fd', '4C': '#fbb6ce', 
-            '5B': '#fed7d7', '5C': '#feebc8', '6B': '#fefcbf', '6C': '#c6f6d5', 
-            'Other': '#e2e8f0',
-        };
-        const SUBJECT_COLORS = {
-            'SJ': '#fbcfe8', 'MT': '#fde68a', 'BM': '#bbf7d0', 'BI': '#bae6fd', 
-            'RBT': '#a5b4fc', 'TMK': '#d8b4fe', 'PI': '#6ee7b7', 'PJPK': '#fda4af', 
-            'PSV': '#fca5a5', 'MZ': '#fdba74', 'Other': '#e2e8f0',
-        };
-        const DEFAULT_BG = '#FFFFFF';
+    dayjs.extend(dayjs_plugin_isoWeek);
+    dayjs.extend(dayjs_plugin_customParseFormat);
 
-        const CURRENT_SCHEDULE_KEY = 'sk_sri_aman_schedule_v2';
-        const ARCHIVE_SCHEDULE_KEY = 'sk_sri_aman_schedule_archive';
-        const CURRENT_WEEK_START_KEY = 'sk_sri_aman_current_week_start';
-        const CLASS_OPTIONS_KEY = 'sk_sri_aman_class_options';
-        const SUBJECT_OPTIONS_KEY = 'sk_sri_aman_subject_options';
-        const WEEK_LABEL_KEY = 'sk_sri_aman_week_label';
-        const ADMIN_PASS = 'admin123';
+    // === KONFIGURASI ===
+    const PERIODS_COUNT = 12;
+    const PERIOD_TIMES = [
+      "7.45-8.15", "8.15-8.45", "8.45-9.15", "9.15-9.40", "9.40-10.10",
+      "10.10-10.40", "10.40-11.10", "11.10-11.40", "11.40-12.10",
+      "12.10-12.40", "12.40-1.10", "1.10-1.40"
+    ];
 
-        let currentSchedule = {};
-        let weeklyArchive = [];
-        let currentWeekStart;
-        let currentWeekLabel = 'Minggu Semasa';
-        let autoSaveTimer;
-        let archiveViewIndex = -1;
+    const DAYS_MAP = {
+      'mo': { name: 'Monday', label: 'Mo', bg: 'bg-yellow-300 day-mo' },
+      'tu': { name: 'Tuesday', label: 'Tu', bg: 'bg-green-300 day-tu' },
+      'we': { name: 'Wednesday', label: 'We', bg: 'bg-blue-300 day-we' },
+      'th': { name: 'Thursday', label: 'Th', bg: 'bg-orange-300 day-th' },
+      'fr': { name: 'Friday', label: 'Fr', bg: 'bg-pink-300 day-fr' }
+    };
 
-        // DOM refs
-        const tableHeader = document.querySelector("#schedule-table thead tr");
-        const tableBody = document.getElementById("schedule-body");
-        const weekDateDisplay = document.getElementById("week-date-display");
-        const loadingOverlay = document.getElementById("loading-overlay");
-        const toast = document.getElementById("toast");
-        
-        const adminModal = document.getElementById("admin-modal");
-        const adminLoginBtn = document.getElementById("admin-login-btn");
-        const adminCancelBtn = document.getElementById("admin-cancel-btn");
-        const adminSubmitBtn = document.getElementById("admin-submit-btn");
-        const adminCloseBtn = document.getElementById("admin-close-btn");
-        const loginView = document.getElementById("login-view");
-        const adminPanelView = document.getElementById("admin-panel-view");
-        const adminPassword = document.getElementById("admin-password");
-        const loginError = document.getElementById("login-error");
-        
-        const saveBtn = document.getElementById("save-schedule-btn");
-        const printBtn = document.getElementById("print-schedule-btn");
-        const csvBtn = document.getElementById("download-csv-btn");
-        const excelBtn = document.getElementById("download-excel-btn");
-        const adminClearBtn = document.getElementById("admin-clear-btn");
-        const adminRolloverBtn = document.getElementById("admin-rollover-btn");
-        const manualDateInput = document.getElementById("manual-date-input");
-        const manualDateBtn = document.getElementById("manual-date-btn");
-        const weekLabelInput = document.getElementById("week-label-input");
-        const weekLabelSaveBtn = document.getElementById("week-label-save-btn");
-        const archiveListContainer = document.getElementById("archive-list");
-        const editClassOptions = document.getElementById("edit-class-options");
-        const editSubjectOptions = document.getElementById("edit-subject-options");
-        const saveOptionsBtn = document.getElementById("save-options-btn");
+    let CLASS_OPTIONS = ['', '1B', '1C', '2B', '2C', '3B', '3C', '4B', '4C', '5B', '5C', '6B', '6C', 'Other'];
+    let SUBJECT_OPTIONS = ['', 'SJ', 'MT', 'BM', 'BI', 'RBT', 'TMK', 'PI', 'PJPK', 'PSV', 'MZ', 'Other'];
 
-        const archiveStatus = document.getElementById("archive-status");
-        const archivePrevBtn = document.getElementById("archive-prev");
-        const archiveNextBtn = document.getElementById("archive-next");
-        
-        const printTable = document.getElementById("print-table");
+    const CLASS_COLORS = {
+      '1B': '#fed7d7', '1C': '#feebc8',
+      '2B': '#fefcbf', '2C': '#c6f6d5',
+      '3B': '#bee3f8', '3C': '#c3dafe',
+      '4B': '#e9d8fd', '4C': '#fbb6ce',
+      '5B': '#fed7d7', '5C': '#feebc8',
+      '6B': '#fefcbf', '6C': '#c6f6d5',
+      'Other': '#e2e8f0'
+    };
+    const SUBJECT_COLORS = {
+      'SJ': '#fbcfe8', 'MT': '#fde68a', 'BM': '#bbf7d0', 'BI': '#bae6fd',
+      'RBT': '#a5b4fc', 'TMK': '#d8b4fe', 'PI': '#6ee7b7', 'PJPK': '#fda4af',
+      'PSV': '#fca5a5', 'MZ': '#fdba74', 'Other': '#e2e8f0'
+    };
+    const DEFAULT_BG = '#FFFFFF';
+    const ADMIN_PASS = 'admin123';
 
-        // === 4. FUNGSI UTAMA ===
-        function loadCurrentWeekStart() {
-            if (!currentWeekStart) {
-                const savedDate = localStorage.getItem(CURRENT_WEEK_START_KEY);
-                // Default = Isnin minggu semasa
-                let dateToUse = savedDate ? dayjs(savedDate) : dayjs().isoWeekday(1);
-                if (dateToUse.day() !== 1) {
-                    dateToUse = dateToUse.isoWeekday(1);
-                }
-                currentWeekStart = dateToUse;
-            }
+    // === STATE ===
+    let currentSchedule = {};
+    let weeklyArchive = [];
+    let currentWeekStart = null;   // dayjs()
+    let currentWeekLabel = '';     // cth: "M32"
+    let lastRolloverDate = null;   // dayjs() atau null
+    let archiveViewIndex = -1;     // -1 = minggu semasa
+    let autoSaveTimer = null;
+
+    // DOM refs
+    const tableHeader = document.querySelector("#schedule-table thead tr");
+    const tableBody = document.getElementById("schedule-body");
+    const weekDateDisplay = document.getElementById("week-date-display");
+    const loadingOverlay = document.getElementById("loading-overlay");
+    const toast = document.getElementById("toast");
+
+    const adminModal = document.getElementById("admin-modal");
+    const adminLoginBtn = document.getElementById("admin-login-btn");
+    const adminCancelBtn = document.getElementById("admin-cancel-btn");
+    const adminSubmitBtn = document.getElementById("admin-submit-btn");
+    const adminCloseBtn = document.getElementById("admin-close-btn");
+    const loginView = document.getElementById("login-view");
+    const adminPanelView = document.getElementById("admin-panel-view");
+    const adminPassword = document.getElementById("admin-password");
+    const loginError = document.getElementById("login-error");
+
+    const saveBtn = document.getElementById("save-schedule-btn");
+    const printBtn = document.getElementById("print-schedule-btn");
+    const csvBtn = document.getElementById("download-csv-btn");
+    const excelBtn = document.getElementById("download-excel-btn");
+    const adminClearBtn = document.getElementById("admin-clear-btn");
+    const adminRolloverBtn = document.getElementById("admin-rollover-btn");
+    const manualDateInput = document.getElementById("manual-date-input");
+    const manualDateBtn = document.getElementById("manual-date-btn");
+    const archiveListContainer = document.getElementById("archive-list");
+    const editClassOptions = document.getElementById("edit-class-options");
+    const editSubjectOptions = document.getElementById("edit-subject-options");
+    const saveOptionsBtn = document.getElementById("save-options-btn");
+    const weekLabelInput = document.getElementById("week-label-input");
+    const weekLabelSaveBtn = document.getElementById("week-label-save-btn");
+
+    const archiveStatus = document.getElementById("archive-status");
+    const archivePrevBtn = document.getElementById("archive-prev");
+    const archiveNextBtn = document.getElementById("archive-next");
+
+    const printTable = document.getElementById("print-table");
+
+    // ==== HELPER ====
+    function showToast(message, isError = false) {
+      toast.textContent = message;
+      toast.className = `fixed bottom-5 right-5 px-6 py-3 rounded-lg shadow-xl transition-transform transform ${isError ? 'bg-red-600' : 'bg-green-600'} text-white`;
+      toast.style.display = 'block';
+      toast.style.transform = 'translateX(0)';
+      setTimeout(() => {
+        toast.style.transform = 'translateX(120%)';
+      }, 3000);
+    }
+
+    function showLoading(message = "Memuatkan...") {
+      loadingOverlay.querySelector('span').textContent = message;
+      loadingOverlay.style.display = 'flex';
+    }
+    function hideLoading() {
+      loadingOverlay.style.display = 'none';
+    }
+
+    function getDefaultWeekStart() {
+      // Sentiasa ambil Isnin minggu semasa
+      return dayjs().isoWeekday(1);
+    }
+
+    function createEmptySchedule() {
+      const data = {};
+      Object.keys(DAYS_MAP).forEach(dayKey => {
+        data[dayKey] = {};
+        for (let i = 1; i <= PERIODS_COUNT; i++) {
+          data[dayKey][i] = { class: '', subject: '' };
         }
+      });
+      return data;
+    }
 
-        function loadWeekLabelFromStorage() {
-            const savedLabel = localStorage.getItem(WEEK_LABEL_KEY);
-            currentWeekLabel = savedLabel || 'Minggu Semasa';
+    function applySelectColor(selectElement) {
+      const value = selectElement.value;
+      const type = selectElement.dataset.type;
+      let color = DEFAULT_BG;
+      if (value) {
+        const colors = type === 'class' ? CLASS_COLORS : SUBJECT_COLORS;
+        color = colors[value] || DEFAULT_BG;
+      }
+      selectElement.style.backgroundColor = color;
+    }
+
+    // ==== OPTIONS (CLASS/SUBJECT) ====
+    function loadOptionsFromData(classOptsFromDB, subjectOptsFromDB) {
+      if (Array.isArray(classOptsFromDB) && classOptsFromDB.length) {
+        CLASS_OPTIONS = classOptsFromDB;
+      }
+      if (Array.isArray(subjectOptsFromDB) && subjectOptsFromDB.length) {
+        SUBJECT_OPTIONS = subjectOptsFromDB;
+      }
+      if (CLASS_OPTIONS[0] !== '') CLASS_OPTIONS.unshift('');
+      if (SUBJECT_OPTIONS[0] !== '') SUBJECT_OPTIONS.unshift('');
+    }
+
+    async function saveOptionsToServer() {
+      let classOpts = editClassOptions.value.split(',').map(s => s.trim()).filter(Boolean);
+      let subjectOpts = editSubjectOptions.value.split(',').map(s => s.trim()).filter(Boolean);
+      classOpts.unshift('');
+      subjectOpts.unshift('');
+      CLASS_OPTIONS = classOpts;
+      SUBJECT_OPTIONS = subjectOpts;
+
+      await saveOptionsToDB(CLASS_OPTIONS, SUBJECT_OPTIONS);
+
+      showToast("Pilihan dropdown telah disimpan!");
+
+      // Bina semula jadual dengan pilihan baharu
+      showLoading("Menjana semula jadual...");
+      tableHeader.innerHTML = '<th class="w-28 p-2 text-sm font-bold border-2 border-black uppercase">HARI / WAKTU</th>';
+      tableBody.innerHTML = '';
+      initTableStructure();
+      renderSchedule(currentSchedule, archiveViewIndex !== -1);
+      hideLoading();
+    }
+
+    function initDropdownEditors() {
+      editClassOptions.value = CLASS_OPTIONS.filter(opt => opt !== '').join(',');
+      editSubjectOptions.value = SUBJECT_OPTIONS.filter(opt => opt !== '').join(',');
+      weekLabelInput.value = currentWeekLabel || '';
+    }
+
+    // ==== TABLE STRUCTURE ====
+    function createDropdown(type, day, period) {
+      const select = document.createElement("select");
+      select.className = "w-full p-1 border-0 rounded-md shadow-sm focus:ring-1 focus:ring-blue-500 transition-all duration-200 mb-1";
+      select.dataset.type = type;
+      select.dataset.day = day;
+      select.dataset.period = period;
+
+      const options = type === 'class' ? CLASS_OPTIONS : SUBJECT_OPTIONS;
+      const colors = type === 'class' ? CLASS_COLORS : SUBJECT_COLORS;
+
+      options.forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt;
+        option.textContent = opt;
+        if (opt && colors[opt]) {
+          option.style.backgroundColor = colors[opt];
+        } else if (!opt) {
+          option.style.backgroundColor = DEFAULT_BG;
         }
+        select.appendChild(option);
+      });
 
-        async function init() {
-            showLoading("Memuatkan data...");
-            loadOptionsFromStorage();
-            initTableStructure();
-            loadArchiveFromStorage();
-            loadCurrentWeekStart();
-            loadWeekLabelFromStorage();
-            await checkWeeklyRollover();
-            loadScheduleFromStorage();
-            renderWeekDate();
-            renderSchedule(currentSchedule, false);
-            initEventListeners();
-            initAdminPanel();
-            updateArchiveNav();
-            hideLoading();
+      return select;
+    }
+
+    function initTableStructure() {
+      PERIOD_TIMES.forEach((time, index) => {
+        const th = document.createElement("th");
+        th.className = "p-2 text-xs font-semibold border-2 border-black tracking-wider bg-teal-600";
+        th.innerHTML = `<div class="font-bold text-white">W${index + 1}</div><div class="font-normal text-teal-100">${time}</div>`;
+        tableHeader.appendChild(th);
+      });
+
+      Object.keys(DAYS_MAP).forEach(dayKey => {
+        const day = DAYS_MAP[dayKey];
+        const tr = document.createElement("tr");
+        tr.className = day.bg;
+
+        const th = document.createElement("th");
+        th.className = "p-2 text-lg sm:text-xl font-bold border-2 border-black text-gray-800 print-day-header";
+        th.textContent = day.label;
+        tr.appendChild(th);
+
+        for (let i = 1; i <= PERIODS_COUNT; i++) {
+          const td = document.createElement("td");
+          td.className = "p-1 h-20 border-2 border-black bg-white";
+          td.dataset.day = dayKey;
+          td.dataset.period = i;
+
+          const classSelect = createDropdown('class', dayKey, i);
+          const subjectSelect = createDropdown('subject', dayKey, i);
+
+          const printValueClass = document.createElement("span");
+          printValueClass.className = "print-value print-class-value";
+
+          const printValueSubject = document.createElement("span");
+          printValueSubject.className = "print-value print-subject-value";
+
+          td.appendChild(classSelect);
+          td.appendChild(subjectSelect);
+          td.appendChild(printValueClass);
+          td.appendChild(printValueSubject);
+
+          tr.appendChild(td);
         }
+        tableBody.appendChild(tr);
+      });
+    }
 
-        function initTableStructure() {
-            PERIOD_TIMES.forEach((time, index) => {
-                const th = document.createElement("th");
-                th.className = "p-2 text-xs font-semibold border-2 border-black tracking-wider bg-teal-600";
-                th.innerHTML = `<div class="font-bold text-white">W${index + 1}</div><div class="font-normal text-teal-100">${time}</div>`;
-                tableHeader.appendChild(th);
-            });
+    // ==== RENDERING ====
+    function renderWeekDate() {
+      if (!currentWeekStart) {
+        currentWeekStart = getDefaultWeekStart();
+      }
+      const startDate = currentWeekStart.format("D");
+      const endDate = currentWeekStart.add(4, 'day').format("D MMM YYYY").toUpperCase();
+      weekDateDisplay.textContent = `TARIKH: ${startDate} - ${endDate}`;
+    }
 
-            Object.keys(DAYS_MAP).forEach(dayKey => {
-                const day = DAYS_MAP[dayKey];
-                const tr = document.createElement("tr");
-                tr.className = `${day.bg}`;
-                
-                const th = document.createElement("th");
-                th.className = "p-2 text-lg sm:text-xl font-bold border-2 border-black text-gray-800 print-day-header";
-                th.textContent = day.label;
-                tr.appendChild(th);
+    function migrateScheduleData(data) {
+      if (!data) return createEmptySchedule();
+      const firstDayKey = Object.keys(DAYS_MAP)[0];
+      const firstCellData = data[firstDayKey] ? data[firstDayKey]['1'] : null;
 
-                for (let i = 1; i <= PERIODS_COUNT; i++) {
-                    const td = document.createElement("td");
-                    td.className = "p-1 h-20 border-2 border-black bg-white";
-                    td.dataset.day = dayKey;
-                    td.dataset.period = i;
-
-                    const classSelect = createDropdown('class', dayKey, i);
-                    const subjectSelect = createDropdown('subject', dayKey, i);
-                    
-                    const printValueClass = document.createElement("span");
-                    printValueClass.className = "print-value print-class-value";
-                    const printValueSubject = document.createElement("span");
-                    printValueSubject.className = "print-value print-subject-value";
-
-                    td.appendChild(classSelect);
-                    td.appendChild(subjectSelect);
-                    td.appendChild(printValueClass);
-                    td.appendChild(printValueSubject);
-                    tr.appendChild(td);
-                }
-                tableBody.appendChild(tr);
-            });
-        }
-        
-        function createDropdown(type, day, period) {
-            const select = document.createElement("select");
-            select.className = "w-full p-1 border-0 rounded-md shadow-sm focus:ring-1 focus:ring-blue-500 transition-all duration-200 mb-1";
-            select.dataset.type = type;
-            select.dataset.day = day;
-            select.dataset.period = period;
-
-            const options = (type === 'class') ? CLASS_OPTIONS : SUBJECT_OPTIONS;
-            const colors = (type === 'class') ? CLASS_COLORS : SUBJECT_COLORS;
-
-            options.forEach(opt => {
-                const option = document.createElement('option');
-                option.value = opt;
-                option.textContent = opt;
-                if (opt && colors[opt]) {
-                    option.style.backgroundColor = colors[opt];
-                } else if (!opt) {
-                    option.style.backgroundColor = DEFAULT_BG;
-                }
-                select.appendChild(option);
-            });
-            return select;
-        }
-
-        function renderWeekDate() {
-            if (!currentWeekStart) {
-                loadCurrentWeekStart();
-            }
-            const startDate = currentWeekStart.format("D");
-            const endDate = currentWeekStart.add(4, 'day').format("D MMM YYYY").toUpperCase();
-            weekDateDisplay.textContent = `TARIKH: ${startDate} - ${endDate}`;
-        }
-
-        // === 5. DATA MANAGEMENT ===
-        function loadOptionsFromStorage() {
-            const savedClassOpts = localStorage.getItem(CLASS_OPTIONS_KEY);
-            const savedSubjectOpts = localStorage.getItem(SUBJECT_OPTIONS_KEY);
-            
-            if (savedClassOpts) {
-                CLASS_OPTIONS = savedClassOpts.split(',').map(s => s.trim());
+      if (firstCellData && typeof firstCellData === 'string') {
+        const newSchedule = createEmptySchedule();
+        Object.keys(DAYS_MAP).forEach(dayKey => {
+          for (let i = 1; i <= PERIODS_COUNT; i++) {
+            const oldVal = data[dayKey]?.[i] || '';
+            if (CLASS_OPTIONS.includes(oldVal)) {
+              newSchedule[dayKey][i] = { class: oldVal, subject: '' };
+            } else if (SUBJECT_OPTIONS.includes(oldVal)) {
+              newSchedule[dayKey][i] = { class: '', subject: oldVal };
+            } else if (oldVal) {
+              newSchedule[dayKey][i] = { class: 'Other', subject: 'Other' };
             } else {
-                localStorage.setItem(CLASS_OPTIONS_KEY, CLASS_OPTIONS.join(','));
+              newSchedule[dayKey][i] = { class: '', subject: '' };
             }
+          }
+        });
+        return newSchedule;
+      }
+      return data || createEmptySchedule();
+    }
 
-            if (savedSubjectOpts) {
-                SUBJECT_OPTIONS = savedSubjectOpts.split(',').map(s => s.trim());
+    function renderSchedule(data, isArchive = false) {
+      const schedule = data || createEmptySchedule();
+
+      Object.keys(DAYS_MAP).forEach(dayKey => {
+        for (let i = 1; i <= PERIODS_COUNT; i++) {
+          const cell = tableBody.querySelector(`td[data-day='${dayKey}'][data-period='${i}']`);
+          if (!cell) continue;
+
+          const classSelect = cell.querySelector("select[data-type='class']");
+          const subjectSelect = cell.querySelector("select[data-type='subject']");
+          const printClassVal = cell.querySelector(".print-class-value");
+          const printSubjectVal = cell.querySelector(".print-subject-value");
+
+          let cellData = schedule[dayKey] ? schedule[dayKey][i] : null;
+
+          if (typeof cellData === 'string') {
+            if (CLASS_OPTIONS.includes(cellData)) {
+              cellData = { class: cellData, subject: '' };
+            } else if (SUBJECT_OPTIONS.includes(cellData)) {
+              cellData = { class: '', subject: cellData };
             } else {
-                localStorage.setItem(SUBJECT_OPTIONS_KEY, SUBJECT_OPTIONS.join(','));
+              cellData = { class: '', subject: '' };
             }
-            
-            if (CLASS_OPTIONS[0] !== '') CLASS_OPTIONS.unshift('');
-            if (SUBJECT_OPTIONS[0] !== '') SUBJECT_OPTIONS.unshift('');
+          } else if (!cellData || typeof cellData.class === 'undefined') {
+            cellData = { class: '', subject: '' };
+          }
+
+          classSelect.value = cellData.class || '';
+          subjectSelect.value = cellData.subject || '';
+
+          printClassVal.textContent = cellData.class || '';
+          printSubjectVal.textContent = cellData.subject || '';
+
+          applySelectColor(classSelect);
+          applySelectColor(subjectSelect);
+
+          classSelect.disabled = isArchive;
+          subjectSelect.disabled = isArchive;
         }
-        
-        function saveOptionsToStorage() {
-            let classOpts = editClassOptions.value.split(',').map(s => s.trim()).filter(Boolean);
-            let subjectOpts = editSubjectOptions.value.split(',').map(s => s.trim()).filter(Boolean);
+      });
+    }
 
-            classOpts.unshift('');
-            subjectOpts.unshift('');
-            
-            CLASS_OPTIONS = classOpts;
-            SUBJECT_OPTIONS = subjectOpts;
+    async function saveScheduleToServer(showMessage = true) {
+      try {
+        await saveScheduleToDB(currentSchedule);
+        if (showMessage) showToast("Jadual disimpan!");
+      } catch (e) {
+        console.error(e);
+        showToast("Gagal menyimpan jadual ke server.", true);
+      }
+    }
 
-            localStorage.setItem(CLASS_OPTIONS_KEY, CLASS_OPTIONS.join(','));
-            localStorage.setItem(SUBJECT_OPTIONS_KEY, SUBJECT_OPTIONS.join(','));
-            
-            showToast("Pilihan dropdown telah disimpan!");
-            
-            showLoading("Menjana semula jadual...");
-            tableHeader.innerHTML = '<th class="w-28 p-2 text-sm font-bold border-2 border-black uppercase">HARI / WAKTU</th>';
-            tableBody.innerHTML = '';
-            initTableStructure();
-            renderSchedule(currentSchedule, false);
-            hideLoading();
+    // ==== ADMIN MODAL ====
+    function openAdminModal() {
+      adminModal.style.display = 'flex';
+      adminPassword.value = '';
+      loginError.style.display = 'none';
+      loginView.style.display = 'block';
+      adminPanelView.style.display = 'none';
+      adminPassword.focus();
+    }
+
+    function closeAdminModal() {
+      adminModal.style.display = 'none';
+    }
+
+    function handleAdminLogin() {
+      if (adminPassword.value === ADMIN_PASS) {
+        loginView.style.display = 'none';
+        adminPanelView.style.display = 'block';
+        renderArchiveList();
+        initDropdownEditors();
+      } else {
+        loginError.style.display = 'block';
+      }
+    }
+
+    // ==== ARKIB ====
+    function renderArchiveList() {
+      if (!weeklyArchive || weeklyArchive.length === 0) {
+        archiveListContainer.innerHTML = '<p class="text-gray-500">Tiada arkib ditemui.</p>';
+        return;
+      }
+      archiveListContainer.innerHTML = '';
+      weeklyArchive.forEach((entry, index) => {
+        const div = document.createElement("div");
+        div.className = "flex justify-between items-center p-2 rounded-lg hover:bg-gray-100";
+
+        const label = document.createElement("span");
+        const weekLabel = entry.weekLabel ? ` (${entry.weekLabel})` : '';
+        label.textContent = `${entry.label}${weekLabel}`;
+        label.className = "font-medium text-gray-700";
+        div.appendChild(label);
+
+        const btnGroup = document.createElement("div");
+        btnGroup.className = "flex gap-2";
+
+        const viewBtn = document.createElement("button");
+        viewBtn.textContent = "Lihat";
+        viewBtn.className = "text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600";
+        viewBtn.onclick = () => viewArchiveWeek(index);
+        btnGroup.appendChild(viewBtn);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "Padam";
+        deleteBtn.className = "text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600";
+        deleteBtn.onclick = () => deleteArchiveEntry(index);
+        btnGroup.appendChild(deleteBtn);
+
+        div.appendChild(btnGroup);
+        archiveListContainer.appendChild(div);
+      });
+    }
+
+    async function deleteArchiveEntry(index) {
+      if (!weeklyArchive[index]) return;
+      if (confirm(`Anda pasti mahu padam arkib "${weeklyArchive[index].label}"?`)) {
+        weeklyArchive.splice(index, 1);
+        await saveArchiveToDB(weeklyArchive);
+        renderArchiveList();
+        showToast("Arkib telah dipadam.", true);
+        updateArchiveNav();
+      }
+    }
+
+    function viewArchiveWeek(index) {
+      archiveViewIndex = index;
+      const entry = weeklyArchive[index];
+      renderSchedule(entry.schedule, true);
+
+      const startDate = dayjs(entry.startDate).format("D");
+      const endDate = dayjs(entry.startDate).add(4, 'day').format("D MMM YYYY").toUpperCase();
+      weekDateDisplay.textContent = `ARKIB: ${startDate} - ${endDate}`;
+
+      updateArchiveNav();
+      closeAdminModal();
+    }
+
+    function navigateArchive(direction) {
+      let newIndex = archiveViewIndex + direction;
+
+      if (newIndex > weeklyArchive.length - 1) newIndex = weeklyArchive.length - 1;
+      if (newIndex < -1) newIndex = -1;
+
+      if (newIndex === archiveViewIndex) return;
+
+      archiveViewIndex = newIndex;
+
+      if (archiveViewIndex === -1) {
+        renderSchedule(currentSchedule, false);
+        renderWeekDate();
+      } else {
+        const entry = weeklyArchive[archiveViewIndex];
+        renderSchedule(entry.schedule, true);
+        const startDate = dayjs(entry.startDate).format("D");
+        const endDate = dayjs(entry.startDate).add(4, 'day').format("D MMM YYYY").toUpperCase();
+        weekDateDisplay.textContent = `ARKIB: ${startDate} - ${endDate}`;
+      }
+      updateArchiveNav();
+    }
+
+    function updateArchiveNav() {
+      if (archiveViewIndex <= -1) {
+        archiveNextBtn.disabled = true;
+        archiveNextBtn.classList.add("opacity-50", "cursor-not-allowed");
+      } else {
+        archiveNextBtn.disabled = false;
+        archiveNextBtn.classList.remove("opacity-50", "cursor-not-allowed");
+      }
+
+      if (archiveViewIndex >= weeklyArchive.length - 1) {
+        archivePrevBtn.disabled = true;
+        archivePrevBtn.classList.add("opacity-50", "cursor-not-allowed");
+      } else {
+        archivePrevBtn.disabled = false;
+        archivePrevBtn.classList.remove("opacity-50", "cursor-not-allowed");
+      }
+
+      if (archiveViewIndex === -1) {
+        archiveStatus.textContent = currentWeekLabel || "Minggu Semasa";
+      } else if (weeklyArchive[archiveViewIndex]) {
+        const e = weeklyArchive[archiveViewIndex];
+        archiveStatus.textContent = e.weekLabel || e.label;
+      } else {
+        archiveStatus.textContent = currentWeekLabel || "Minggu Semasa";
+        archiveViewIndex = -1;
+      }
+    }
+
+    // ==== ROLLOVER (Sabtu) ====
+    async function handleRollover(isManual) {
+      if (!currentWeekStart) {
+        currentWeekStart = getDefaultWeekStart();
+      }
+
+      const startDateLabel = currentWeekStart.format("D MMM");
+      const endDateLabel = currentWeekStart.add(4, 'day').format("D MMM YYYY");
+      const archiveLabel = `Minggu ${startDateLabel} - ${endDateLabel}`;
+
+      const archiveEntry = {
+        id: new Date().toISOString(),
+        label: archiveLabel,
+        weekLabel: currentWeekLabel || '',
+        startDate: currentWeekStart.format("YYYY-MM-DD"),
+        schedule: currentSchedule
+      };
+
+      weeklyArchive.unshift(archiveEntry);
+      await saveArchiveToDB(weeklyArchive);
+
+      currentSchedule = createEmptySchedule();
+      await saveScheduleToServer(false);
+
+      currentWeekStart = currentWeekStart.add(7, 'days');
+      await saveWeekStartToDB(currentWeekStart.format("YYYY-MM-DD"));
+
+      currentWeekLabel = '';
+      await saveWeekLabelToDB(currentWeekLabel);
+
+      renderWeekDate();
+      renderSchedule(currentSchedule, false);
+      updateArchiveNav();
+
+      if (isManual) {
+        showToast("Jadual telah diarkib & minggu baru dimulakan!");
+        closeAdminModal();
+      }
+    }
+
+    async function checkWeeklyRollover(initialLastRolloverStr) {
+      const today = dayjs();
+      if (today.day() !== 6) return; // 6 = Sabtu
+
+      let lastRoll = initialLastRolloverStr ? dayjs(initialLastRolloverStr) : null;
+
+      if (!lastRoll || lastRoll.isBefore(today, 'day')) {
+        if (!currentWeekStart) currentWeekStart = getDefaultWeekStart();
+        if (currentWeekStart.isBefore(today, 'day')) {
+          showLoading("Memulakan minggu baru...");
+          await handleRollover(false);
+          await saveLastRolloverDateToDB(today.format("YYYY-MM-DD"));
+          hideLoading();
+          showToast("Minggu baru telah dimulakan (auto Sabtu)!");
         }
+      }
+    }
 
-        function createEmptySchedule() {
-            const emptySchedule = {};
-            Object.keys(DAYS_MAP).forEach(dayKey => {
-                emptySchedule[dayKey] = {};
-                for (let i = 1; i <= PERIODS_COUNT; i++) {
-                    emptySchedule[dayKey][i] = { class: '', subject: '' };
-                }
-            });
-            return emptySchedule;
+    // ==== EKSPORT & CETAK ====
+    function getDisplayedScheduleData() {
+      if (archiveViewIndex === -1) {
+        return currentSchedule;
+      }
+      return weeklyArchive[archiveViewIndex]?.schedule || currentSchedule;
+    }
+
+    function exportCSV() {
+      const data = getDisplayedScheduleData();
+      if (!data) {
+        showToast("Tiada data untuk dieksport.", true);
+        return;
+      }
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "Hari/Waktu," + PERIOD_TIMES.map((time, i) => `W${i + 1} (${time})`).join(",") + "\r\n";
+
+      Object.keys(DAYS_MAP).forEach(dayKey => {
+        const dayLabel = DAYS_MAP[dayKey].label;
+        const row = [dayLabel];
+        for (let i = 1; i <= PERIODS_COUNT; i++) {
+          const cellData = data[dayKey]?.[i] || { class: '', subject: '' };
+          const cellValue = `${cellData.class || ''} / ${cellData.subject || ''}`;
+          row.push(`"${cellValue.replace(/"/g, '""')}"`);
         }
+        csvContent += row.join(",") + "\r\n";
+      });
 
-        function loadScheduleFromStorage() {
-            let data = localStorage.getItem(CURRENT_SCHEDULE_KEY);
-            if (data) {
-                try {
-                    currentSchedule = JSON.parse(data);
-                    currentSchedule = migrateScheduleData(currentSchedule);
-                } catch (e) {
-                    console.error("Gagal memuatkan jadual:", e);
-                    currentSchedule = createEmptySchedule();
-                }
-            } else {
-                currentSchedule = createEmptySchedule();
-            }
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `jadual_makmal_${dayjs().format("YYYYMMDD")}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast("CSV dimuat turun!");
+    }
+
+    function exportXLSX() {
+      const data = getDisplayedScheduleData();
+      if (!data) {
+        showToast("Tiada data untuk dieksport.", true);
+        return;
+      }
+      const wb = XLSX.utils.book_new();
+      const ws_data = [];
+
+      const header = ["Hari/Waktu"];
+      PERIOD_TIMES.forEach((time, i) => {
+        header.push(`W${i + 1} (${time})`);
+      });
+      ws_data.push(header);
+
+      Object.keys(DAYS_MAP).forEach(dayKey => {
+        const dayLabel = DAYS_MAP[dayKey].label;
+        const row = [dayLabel];
+        for (let i = 1; i <= PERIODS_COUNT; i++) {
+          const cellData = data[dayKey]?.[i] || { class: '', subject: '' };
+          const cellValue = `${cellData.class || ''}\n${cellData.subject || ''}`.trim();
+          row.push(cellValue);
         }
-        
-        function migrateScheduleData(data) {
-            const firstDayKey = Object.keys(DAYS_MAP)[0];
-            const firstCellData = data[firstDayKey] ? data[firstDayKey]['1'] : null;
+        ws_data.push(row);
+      });
 
-            if (firstCellData && typeof firstCellData === 'string') {
-                showToast("Mengemas kini format data jadual...");
-                const newSchedule = createEmptySchedule();
-                Object.keys(DAYS_MAP).forEach(dayKey => {
-                    for (let i = 1; i <= PERIODS_COUNT; i++) {
-                        const oldVal = data[dayKey]?.[i] || '';
-                        if (CLASS_OPTIONS.includes(oldVal)) {
-                            newSchedule[dayKey][i] = { class: oldVal, subject: '' };
-                        } else if (SUBJECT_OPTIONS.includes(oldVal)) {
-                            newSchedule[dayKey][i] = { class: '', subject: oldVal };
-                        } else if (oldVal) {
-                             newSchedule[dayKey][i] = { class: 'Other', subject: 'Other' };
-                        } else {
-                            newSchedule[dayKey][i] = { class: '', subject: '' };
-                        }
-                    }
-                });
-                localStorage.setItem(CURRENT_SCHEDULE_KEY, JSON.stringify(newSchedule));
-                return newSchedule;
-            }
-            return data || createEmptySchedule();
+      const ws = XLSX.utils.aoa_to_sheet(ws_data);
+      const cols = [{ wch: 15 }];
+      for (let i = 1; i <= PERIODS_COUNT; i++) cols.push({ wch: 15 });
+      ws['!cols'] = cols;
+
+      XLSX.utils.book_append_sheet(wb, ws, "Jadual Makmal");
+      XLSX.writeFile(wb, `jadual_makmal_${dayjs().format("YYYYMMDD")}.xlsx`);
+      showToast("Excel dimuat turun!");
+    }
+
+    function printSchedule() {
+      printTable.innerHTML = '';
+      const mainTable = document.getElementById('schedule-table');
+      const printHead = mainTable.querySelector('thead').cloneNode(true);
+      const printBody = mainTable.querySelector('tbody').cloneNode(true);
+      printTable.appendChild(printHead);
+      printTable.appendChild(printBody);
+      window.print();
+    }
+
+    // ==== EVENT LISTENERS ====
+    function initEventListeners() {
+      tableBody.addEventListener("change", (event) => {
+        if (event.target && event.target.tagName === 'SELECT') {
+          applySelectColor(event.target);
+          clearTimeout(autoSaveTimer);
+          updateScheduleDataFromTable();
+          autoSaveTimer = setTimeout(() => {
+            saveScheduleToServer(false);
+          }, 500);
         }
+      });
 
-        function saveScheduleToStorage() {
-            localStorage.setItem(CURRENT_SCHEDULE_KEY, JSON.stringify(currentSchedule));
-            showToast("Jadual disimpan!");
+      adminLoginBtn.addEventListener("click", openAdminModal);
+      adminCancelBtn.addEventListener("click", closeAdminModal);
+      adminCloseBtn.addEventListener("click", closeAdminModal);
+      adminSubmitBtn.addEventListener("click", handleAdminLogin);
+
+      archivePrevBtn.addEventListener("click", () => navigateArchive(1));
+      archiveNextBtn.addEventListener("click", () => navigateArchive(-1));
+    }
+
+    function updateScheduleDataFromTable() {
+      const newSchedule = createEmptySchedule();
+      Object.keys(DAYS_MAP).forEach(dayKey => {
+        for (let i = 1; i <= PERIODS_COUNT; i++) {
+          const cell = tableBody.querySelector(`td[data-day='${dayKey}'][data-period='${i}']`);
+          if (!cell) continue;
+          const classVal = cell.querySelector("select[data-type='class']").value;
+          const subjectVal = cell.querySelector("select[data-type='subject']").value;
+          newSchedule[dayKey][i] = { class: classVal, subject: subjectVal };
         }
+      });
+      currentSchedule = newSchedule;
+    }
 
-        function loadArchiveFromStorage() {
-            let data = localStorage.getItem(ARCHIVE_SCHEDULE_KEY);
-            if (data) {
-                try {
-                    weeklyArchive = JSON.parse(data);
-                } catch (e) {
-                    console.error("Gagal memuatkan arkib:", e);
-                    weeklyArchive = [];
-                }
-            } else {
-                weeklyArchive = [];
-            }
-            renderArchiveList();
+    function initAdminPanel() {
+      saveBtn.addEventListener("click", () => {
+        updateScheduleDataFromTable();
+        saveScheduleToServer(true);
+      });
+
+      printBtn.addEventListener("click", printSchedule);
+      csvBtn.addEventListener("click", exportCSV);
+      excelBtn.addEventListener("click", exportXLSX);
+
+      adminClearBtn.addEventListener("click", async () => {
+        if (confirm("Anda pasti mahu kosongkan semua data jadual minggu ini? Tindakan ini tidak boleh diundur.")) {
+          currentSchedule = createEmptySchedule();
+          await saveScheduleToServer(false);
+          renderSchedule(currentSchedule, false);
+          showToast("Jadual minggu ini telah dikosongkan.", true);
         }
+      });
 
-        function saveArchiveToStorage() {
-            localStorage.setItem(ARCHIVE_SCHEDULE_KEY, JSON.stringify(weeklyArchive));
-            renderArchiveList();
+      adminRolloverBtn.addEventListener("click", async () => {
+        if (confirm("Anda pasti mahu simpan jadual ini ke arkib dan mulakan minggu baru?")) {
+          await handleRollover(true);
         }
+      });
 
-        function applySelectColor(selectElement) {
-            const value = selectElement.value;
-            const type = selectElement.dataset.type;
-            let color = DEFAULT_BG;
-
-            if (value) {
-                const colors = (type === 'class') ? CLASS_COLORS : SUBJECT_COLORS;
-                color = colors[value] || DEFAULT_BG;
-            }
-            selectElement.style.backgroundColor = color;
+      manualDateBtn.addEventListener("click", async () => {
+        const newDate = manualDateInput.value;
+        if (newDate) {
+          let newStartDate = dayjs(newDate);
+          if (newStartDate.day() !== 1) {
+            newStartDate = newStartDate.isoWeekday(1);
+            alert("Tarikh telah ditetapkan ke hari Isnin minggu tersebut.");
+          }
+          currentWeekStart = newStartDate;
+          await saveWeekStartToDB(currentWeekStart.format("YYYY-MM-DD"));
+          renderWeekDate();
+          showToast("Tarikh minggu semasa telah ditukar.");
+          closeAdminModal();
         }
-        
-        // === 6. RENDERING ===
-        function renderSchedule(data, isArchive = false) {
-            if (!data) data = createEmptySchedule();
-            
-            Object.keys(DAYS_MAP).forEach(dayKey => {
-                for (let i = 1; i <= PERIODS_COUNT; i++) {
-                    const cell = tableBody.querySelector(`td[data-day='${dayKey}'][data-period='${i}']`);
-                    if (cell) {
-                        const classSelect = cell.querySelector(`select[data-type='class']`);
-                        const subjectSelect = cell.querySelector(`select[data-type='subject']`);
-                        const printClassVal = cell.querySelector('.print-class-value');
-                        const printSubjectVal = cell.querySelector('.print-subject-value');
+      });
 
-                        let cellData = data[dayKey] ? data[dayKey][i] : null;
-
-                        if (typeof cellData === 'string') {
-                            if (CLASS_OPTIONS.includes(cellData)) {
-                                cellData = { class: cellData, subject: '' };
-                            } else if (SUBJECT_OPTIONS.includes(cellData)) {
-                                cellData = { class: '', subject: cellData };
-                            } else {
-                                cellData = { class: '', subject: '' };
-                            }
-                        } else if (!cellData || typeof cellData.class === 'undefined') {
-                            cellData = { class: '', subject: '' };
-                        }
-
-                        classSelect.value = cellData.class || '';
-                        subjectSelect.value = cellData.subject || '';
-                        
-                        printClassVal.textContent = cellData.class || '';
-                        printSubjectVal.textContent = cellData.subject || '';
-
-                        applySelectColor(classSelect);
-                        applySelectColor(subjectSelect);
-
-                        classSelect.disabled = isArchive;
-                        subjectSelect.disabled = isArchive;
-                    }
-                }
-            });
+      saveOptionsBtn.addEventListener("click", async () => {
+        if (confirm("Menyimpan pilihan baru akan menjana semula jadual. Anda pasti?")) {
+          await saveOptionsToServer();
         }
+      });
 
-        function updateScheduleDataFromTable() {
-            const newSchedule = createEmptySchedule();
-            Object.keys(DAYS_MAP).forEach(dayKey => {
-                for (let i = 1; i <= PERIODS_COUNT; i++) {
-                    const cell = tableBody.querySelector(`td[data-day='${dayKey}'][data-period='${i}']`);
-                    if (cell) {
-                        const classVal = cell.querySelector(`select[data-type='class']`).value;
-                        const subjectVal = cell.querySelector(`select[data-type='subject']`).value;
-                        newSchedule[dayKey][i] = { class: classVal, subject: subjectVal };
-                    }
-                }
-            });
-            currentSchedule = newSchedule;
-        }
-        
-        function showToast(message, isError = false) {
-            toast.textContent = message;
-            toast.className = `fixed bottom-5 right-5 px-6 py-3 rounded-lg shadow-xl transition-transform transform ${isError ? 'bg-red-600' : 'bg-green-600'} text-white`;
-            toast.style.display = 'block';
-            toast.style.transform = 'translateX(0)';
-            
-            setTimeout(() => {
-                toast.style.transform = 'translateX(120%)';
-            }, 3000);
-        }
+      weekLabelSaveBtn.addEventListener("click", async () => {
+        currentWeekLabel = weekLabelInput.value.trim();
+        await saveWeekLabelToDB(currentWeekLabel);
+        updateArchiveNav();
+        showToast("Label minggu telah disimpan!");
+      });
+    }
 
-        function showLoading(message) {
-            loadingOverlay.querySelector('span').textContent = message || "Memuatkan...";
-            loadingOverlay.style.display = 'flex';
-        }
-        function hideLoading() {
-            loadingOverlay.style.display = 'none';
-        }
+    // ==== INIT APP ====
+    async function init() {
+      showLoading("Memuatkan data...");
+      try {
+        const initial = await loadInitialData();
 
-        // === 7. EVENT LISTENERS ===
-        function initEventListeners() {
-            tableBody.addEventListener("change", (event) => {
-                if (event.target && event.target.tagName === 'SELECT') {
-                    applySelectColor(event.target);
-                    clearTimeout(autoSaveTimer);
-                    updateScheduleDataFromTable();
-                    autoSaveTimer = setTimeout(() => {
-                        saveScheduleToStorage();
-                    }, 500);
-                }
-            });
+        loadOptionsFromData(initial.classOptions, initial.subjectOptions);
+        initTableStructure();
 
-            adminLoginBtn.addEventListener("click", openAdminModal);
-            adminCancelBtn.addEventListener("click", closeAdminModal);
-            adminCloseBtn.addEventListener("click", closeAdminModal);
-            adminSubmitBtn.addEventListener("click", handleAdminLogin);
-            
-            archivePrevBtn.addEventListener("click", () => navigateArchive(-1));
-            archiveNextBtn.addEventListener("click", () => navigateArchive(1));
-        }
-        
-        function initAdminPanel() {
-            saveBtn.addEventListener("click", () => {
-                updateScheduleDataFromTable();
-                saveScheduleToStorage();
-            });
-            printBtn.addEventListener("click", printSchedule);
-            csvBtn.addEventListener("click", exportCSV);
-            excelBtn.addEventListener("click", exportXLSX);
-            
-            adminClearBtn.addEventListener("click", () => {
-                if (confirm("Anda pasti mahu kosongkan semua data jadual minggu ini? Tindakan ini tidak boleh diundur.")) {
-                    currentSchedule = createEmptySchedule();
-                    saveScheduleToStorage();
-                    renderSchedule(currentSchedule, false);
-                    showToast("Jadual minggu ini telah dikosongkan.", true);
-                }
-            });
-            
-            adminRolloverBtn.addEventListener("click", () => {
-                if (confirm("Anda pasti mahu simpan jadual ini ke arkib dan mulakan minggu baru?")) {
-                    handleRollover(true);
-                }
-            });
-            
-            manualDateBtn.addEventListener("click", () => {
-                const newDate = manualDateInput.value;
-                if (newDate) {
-                    let newStartDate = dayjs(newDate);
-                    if (newStartDate.day() !== 1) {
-                        newStartDate = newStartDate.isoWeekday(1);
-                        alert("Tarikh telah ditetapkan ke hari Isnin minggu tersebut.");
-                    }
-                    currentWeekStart = newStartDate;
-                    localStorage.setItem(CURRENT_WEEK_START_KEY, currentWeekStart.format("YYYY-MM-DD"));
-                    renderWeekDate();
-                    showToast("Tarikh minggu semasa telah ditukar.");
-                    closeAdminModal();
-                }
-            });
-            
-            initDropdownEditors();
-            initWeekLabelEditor();
+        weeklyArchive = Array.isArray(initial.archive) ? initial.archive : [];
+        renderArchiveList();
 
-            saveOptionsBtn.addEventListener("click", () => {
-                if (confirm("Menyimpan pilihan baru akan menjana semula jadual. Anda pasti?")) {
-                    saveOptionsToStorage();
-                }
-            });
-
-            weekLabelSaveBtn.addEventListener("click", () => {
-                const val = weekLabelInput.value.trim();
-                currentWeekLabel = val || "Minggu Semasa";
-                localStorage.setItem(WEEK_LABEL_KEY, currentWeekLabel);
-                updateArchiveNav();
-                showToast("Label minggu telah dikemas kini!");
-            });
-        }
-        
-        function initDropdownEditors() {
-            editClassOptions.value = CLASS_OPTIONS.filter(opt => opt !== '').join(',');
-            editSubjectOptions.value = SUBJECT_OPTIONS.filter(opt => opt !== '').join(',');
-        }
-
-        function initWeekLabelEditor() {
-            weekLabelInput.value = currentWeekLabel;
-        }
-
-        // === 8. ADMIN & ARKIB ===
-        function openAdminModal() {
-            adminModal.style.display = 'flex';
-            adminPassword.value = '';
-            loginError.style.display = 'none';
-            loginView.style.display = 'block';
-            adminPanelView.style.display = 'none';
-            adminPassword.focus();
-        }
-        function closeAdminModal() {
-            adminModal.style.display = 'none';
-        }
-
-        function handleAdminLogin() {
-            if (adminPassword.value === ADMIN_PASS) {
-                loginView.style.display = 'none';
-                adminPanelView.style.display = 'block';
-                loadArchiveFromStorage();
-                initDropdownEditors();
-                initWeekLabelEditor();
-            } else {
-                loginError.style.display = 'block';
-            }
-        }
-        
-        // Rollover pada hari SABTU
-        async function checkWeeklyRollover() {
-            const today = dayjs();
-
-            // Hari Sabtu = 6
-            if (today.day() === 6) {
-                if (!currentWeekStart) loadCurrentWeekStart();
-
-                const lastRollover = localStorage.getItem('last_rollover_date');
-                const lastRolloverDate = lastRollover ? dayjs(lastRollover) : null;
-
-                // Hanya rollover jika belum pernah pada Sabtu ini
-                if (!lastRolloverDate || !lastRolloverDate.isSame(today, 'day')) {
-                    // Pastikan minggu stored adalah sebelum hari ini
-                    if (currentWeekStart.isBefore(today, 'day')) {
-                        showLoading("Memulakan minggu baru...");
-                        await handleRollover(false);
-                        localStorage.setItem('last_rollover_date', today.format('YYYY-MM-DD'));
-                        hideLoading();
-                        showToast("Minggu baru telah dimulakan!");
-                    }
-                }
-            }
-            return Promise.resolve();
-        }
-
-        function handleRollover(isManual) {
-            return new Promise((resolve) => {
-                if (!currentWeekStart) {
-                    loadCurrentWeekStart();
-                }
-                
-                const startDate = currentWeekStart.format("D MMM");
-                const endDate = currentWeekStart.add(4, 'day').format("D MMM YYYY");
-                const archiveLabel = `Minggu ${startDate} - ${endDate}`;
-                
-                const archiveEntry = {
-                    id: new Date().toISOString(),
-                    label: archiveLabel,
-                    startDate: currentWeekStart.format("YYYY-MM-DD"),
-                    schedule: JSON.parse(JSON.stringify(currentSchedule))
-                };
-                
-                weeklyArchive.unshift(archiveEntry);
-                saveArchiveToStorage();
-                
-                currentSchedule = createEmptySchedule();
-                saveScheduleToStorage();
-                
-                // Minggu baru = tambah 7 hari (Isnin minggu hadapan)
-                currentWeekStart = currentWeekStart.add(7, 'days');
-                localStorage.setItem(CURRENT_WEEK_START_KEY, currentWeekStart.format("YYYY-MM-DD"));
-                
-                if (isManual) {
-                    renderWeekDate();
-                    renderSchedule(currentSchedule, false);
-                    showToast("Jadual telah diarkib & minggu baru dimulakan!");
-                    closeAdminModal();
-                }
-                resolve();
-            });
-        }
-        
-        function renderArchiveList() {
-            if (weeklyArchive.length === 0) {
-                archiveListContainer.innerHTML = '<p class="text-gray-500">Tiada arkib ditemui.</p>';
-                return;
-            }
-            
-            archiveListContainer.innerHTML = '';
-            weeklyArchive.forEach((entry, index) => {
-                const div = document.createElement("div");
-                div.className = "flex justify-between items-center p-2 rounded-lg hover:bg-gray-100";
-                
-                const label = document.createElement("span");
-                label.textContent = entry.label;
-                label.className = "font-medium text-gray-700";
-                div.appendChild(label);
-                
-                const btnGroup = document.createElement("div");
-                btnGroup.className = "flex gap-2";
-
-                const viewBtn = document.createElement("button");
-                viewBtn.textContent = "Lihat";
-                viewBtn.className = "text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600";
-                viewBtn.onclick = () => viewArchiveWeek(index);
-                btnGroup.appendChild(viewBtn);
-
-                const deleteBtn = document.createElement("button");
-                deleteBtn.textContent = "Padam";
-                deleteBtn.className = "text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600";
-                deleteBtn.onclick = () => deleteArchiveEntry(index);
-                btnGroup.appendChild(deleteBtn);
-                
-                div.appendChild(btnGroup);
-                archiveListContainer.appendChild(div);
-            });
-        }
-        
-        function deleteArchiveEntry(index) {
-            if (confirm(`Anda pasti mahu padam arkib "${weeklyArchive[index].label}"?`)) {
-                weeklyArchive.splice(index, 1);
-                saveArchiveToStorage();
-                showToast("Arkib telah dipadam.", true);
-            }
-        }
-        
-        function viewArchiveWeek(index) {
-            archiveViewIndex = index;
-            const entry = weeklyArchive[index];
-            renderSchedule(entry.schedule, true);
-            
-            const startDate = dayjs(entry.startDate).format("D");
-            const endDate = dayjs(entry.startDate).add(4, 'day').format("D MMM YYYY").toUpperCase();
-            weekDateDisplay.textContent = `ARKIB: ${startDate} - ${endDate}`;
-            
-            updateArchiveNav();
-            closeAdminModal();
-        }
-        
-        function navigateArchive(direction) {
-            let newIndex = archiveViewIndex + direction;
-            
-            if (newIndex > weeklyArchive.length - 1) {
-                newIndex = weeklyArchive.length - 1;
-            }
-            
-            if (newIndex < -1) {
-                newIndex = -1;
-            }
-            
-            if (newIndex === archiveViewIndex) return;
-
-            archiveViewIndex = newIndex;
-            
-            if (archiveViewIndex === -1) {
-                renderSchedule(currentSchedule, false);
-                renderWeekDate();
-            } else {
-                const entry = weeklyArchive[archiveViewIndex];
-                renderSchedule(entry.schedule, true);
-                
-                const startDate = dayjs(entry.startDate).format("D");
-                const endDate = dayjs(entry.startDate).add(4, 'day').format("D MMM YYYY").toUpperCase();
-                weekDateDisplay.textContent = `ARKIB: ${startDate} - ${endDate}`;
-            }
-            updateArchiveNav();
-        }
-        
-        function updateArchiveNav() {
-            // Button state
-            if (archiveViewIndex <= -1) {
-                archiveNextBtn.disabled = true;
-                archiveNextBtn.classList.add("opacity-50", "cursor-not-allowed");
-            } else {
-                archiveNextBtn.disabled = false;
-                archiveNextBtn.classList.remove("opacity-50", "cursor-not-allowed");
-            }
-            
-            if (archiveViewIndex >= weeklyArchive.length - 1) {
-                archivePrevBtn.disabled = true;
-                archivePrevBtn.classList.add("opacity-50", "cursor-not-allowed");
-            } else {
-                archivePrevBtn.disabled = false;
-                archivePrevBtn.classList.remove("opacity-50", "cursor-not-allowed");
-            }
-            
-            // Status text
-            if (archiveViewIndex === -1) {
-                archiveStatus.textContent = currentWeekLabel;
-            } else if (weeklyArchive[archiveViewIndex]) {
-                archiveStatus.textContent = weeklyArchive[archiveViewIndex].label;
-            } else {
-                archiveStatus.textContent = currentWeekLabel;
-                archiveViewIndex = -1;
-            }
+        if (initial.weekStart) {
+          currentWeekStart = dayjs(initial.weekStart);
+        } else {
+          currentWeekStart = getDefaultWeekStart();
+          await saveWeekStartToDB(currentWeekStart.format("YYYY-MM-DD"));
         }
 
-        // === 9. EKSPORT & CETAK ===
-        function getDisplayedScheduleData() {
-            if (archiveViewIndex === -1) {
-                return currentSchedule;
-            } else {
-                return weeklyArchive[archiveViewIndex].schedule;
-            }
+        currentWeekLabel = initial.weekLabel || '';
+        if (initial.lastRolloverDate) {
+          lastRolloverDate = dayjs(initial.lastRolloverDate);
         }
 
-        function exportCSV() {
-            const data = getDisplayedScheduleData();
-            if (!data) {
-                showToast("Tiada data untuk dieksport.", true);
-                return;
-            }
-            let csvContent = "data:text/csv;charset=utf-8,";
-            
-            csvContent += "Hari/Waktu," + PERIOD_TIMES.map((time, i) => `W${i+1} (${time})`).join(",") + "\r\n";
-            
-            Object.keys(DAYS_MAP).forEach(dayKey => {
-                const dayLabel = DAYS_MAP[dayKey].label;
-                let row = [dayLabel];
-                for (let i = 1; i <= PERIODS_COUNT; i++) {
-                    const cellData = data[dayKey]?.[i] || { class: '', subject: '' };
-                    const cellValue = `${cellData.class || ''} / ${cellData.subject || ''}`;
-                    row.push(`"${cellValue.replace(/"/g, '""')}"`);
-                }
-                csvContent += row.join(",") + "\r\n";
-            });
-            
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `jadual_makmal_${dayjs().format("YYYYMMDD")}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            showToast("CSV dimuat turun!");
-        }
-        
-        function exportXLSX() {
-            const data = getDisplayedScheduleData();
-            if (!data) {
-                showToast("Tiada data untuk dieksport.", true);
-                return;
-            }
-            const wb = XLSX.utils.book_new();
-            
-            const ws_data = [];
-            
-            const header = ["Hari/Waktu"];
-            PERIOD_TIMES.forEach((time, i) => {
-                header.push(`W${i+1} (${time})`);
-            });
-            ws_data.push(header);
-            
-            Object.keys(DAYS_MAP).forEach(dayKey => {
-                const dayLabel = DAYS_MAP[dayKey].label;
-                const row = [dayLabel];
-                for (let i = 1; i <= PERIODS_COUNT; i++) {
-                    const cellData = data[dayKey]?.[i] || { class: '', subject: '' };
-                    const cellValue = `${cellData.class || ''}\n${cellData.subject || ''}`.trim();
-                    row.push(cellValue);
-                }
-                ws_data.push(row);
-            });
-            
-            const ws = XLSX.utils.aoa_to_sheet(ws_data);
-            
-            const cols = [{ wch: 15 }];
-            for (let i = 1; i <= PERIODS_COUNT; i++) {
-                cols.push({ wch: 15 });
-            }
-            ws['!cols'] = cols;
-            
-            XLSX.utils.book_append_sheet(wb, ws, "Jadual Makmal");
-            XLSX.writeFile(wb, `jadual_makmal_${dayjs().format("YYYYMMDD")}.xlsx`);
-            showToast("Excel dimuat turun!");
-        }
+        currentSchedule = migrateScheduleData(initial.schedule);
+        renderWeekDate();
+        renderSchedule(currentSchedule, false);
+        updateArchiveNav();
 
-        function printSchedule() {
-            printTable.innerHTML = '';
-            const mainTable = document.getElementById('schedule-table');
-            const printHead = mainTable.querySelector('thead').cloneNode(true);
-            const printBody = mainTable.querySelector('tbody').cloneNode(true);
-            printTable.appendChild(printHead);
-            printTable.appendChild(printBody);
-            window.print();
-        }
+        initEventListeners();
+        initAdminPanel();
 
-        // === 10. MULAKAN APP ===
-        init();
-    </script>
+        await checkWeeklyRollover(initial.lastRolloverDate);
+      } catch (e) {
+        console.error(e);
+        showToast("Ralat memuatkan data dari server.", true);
+      } finally {
+        hideLoading();
+      }
+    }
 
+    init();
+  </script>
 </body>
 </html>

@@ -118,7 +118,7 @@
   <div class="max-w-full mx-auto bg-white rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 print-container">
 
     <!-- HEADER -->
-    <header class="flex flex-col sm:flex-row items-center justify-between mb-4 sm:mb-6 pb-4 border-b-2 border-gray-200">
+    <header class="flex flex-col sm:flex-row items-center justify-between mb-2 sm:mb-4 pb-4 border-b-2 border-gray-200">
       <div class="flex items-center mb-3 sm:mb-0">
         <img src="https://i.imgur.com/AfsVtVG.jpeg" alt="Logo Sekolah" class="h-16 w-16 sm:h-20 sm:w-20 mr-4 rounded-md border-2 border-gray-300 no-print">
         <div>
@@ -130,10 +130,43 @@
           </p>
         </div>
       </div>
-      <button id="admin-login-btn" class="no-print bg-blue-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-700 transition duration-300 font-medium">
-        Panel Admin
-      </button>
+      <div class="flex flex-col items-stretch gap-2 no-print">
+        <button id="admin-login-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-700 transition duration-300 font-medium">
+          Panel Admin
+        </button>
+        <button id="toggle-comments-btn" class="bg-amber-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-amber-600 transition duration-300 font-medium text-sm">
+          Komen Guru
+        </button>
+      </div>
     </header>
+
+    <!-- KOMEN GURU (COLLAPSIBLE) -->
+    <div id="comments-panel" class="no-print hidden mb-4">
+      <div class="border border-amber-300 bg-amber-50 rounded-xl p-3 sm:p-4">
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="text-sm sm:text-base font-semibold text-amber-800">
+            Komen Guru Minggu Ini
+          </h3>
+          <span class="text-[11px] sm:text-xs text-amber-700">
+            Komen ini hanya untuk <strong>minggu semasa</strong>
+          </span>
+        </div>
+        <textarea
+          id="week-comments-input"
+          rows="4"
+          class="w-full text-sm p-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+          placeholder="Contoh: Laptop 4 rosak keyboard, Mouse hilang, wifi perlahan..."
+        ></textarea>
+        <div class="mt-2 flex justify-end">
+          <button
+            id="save-comments-btn"
+            class="bg-amber-600 text-white px-4 py-2 rounded-lg shadow hover:bg-amber-700 text-sm"
+          >
+            Simpan Komen
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- TOOLBAR / NAV -->
     <div class="mb-4 flex flex-wrap gap-2 justify-between items-center no-print">
@@ -201,7 +234,7 @@
         <!-- Edit Dropdown Options -->
         <div class="mb-6 p-4 border border-gray-300 rounded-lg bg-gray-50">
           <h3 class="text-xl font-semibold text-gray-700 mb-4">Edit Pilihan Dropdown</h3>
-          <p class="text-sm text-gray-600 mb-3">Masukkan pilihan dipisahkan dengan koma (cth: 1A,1B,1C)</p>
+          <p class="text-sm text-gray-600 mb-3">Masukkan pilihan dipisahkan dengan koma (cth: 1B,1C,2B,2C)</p>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label for="edit-class-options" class="block text-sm font-medium text-gray-700 mb-1">Pilihan Kelas</label>
@@ -224,11 +257,12 @@
             <button id="print-schedule-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700 transition">Cetak Jadual</button>
             <button id="download-csv-btn" class="bg-green-500 text-white px-4 py-2 rounded-lg shadow hover:bg-green-600 transition">Muat Turun CSV</button>
             <button id="download-excel-btn" class="bg-green-700 text-white px-4 py-2 rounded-lg shadow hover:bg-green-800 transition">Muat Turun Excel</button>
+            <button id="copy-table-btn" class="bg-gray-700 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-800 transition">Copy Jadual</button>
           </div>
 
           <div class="flex flex-wrap gap-3 border-t pt-4">
             <button id="admin-clear-btn" class="bg-red-600 text-white px-5 py-2 rounded-lg shadow hover:bg-red-700 transition">Kosongkan Jadual Minggu Ini</button>
-            <button id="admin-rollover-btn" class="bg-purple-600 text-white px-5 py-2 rounded-lg shadow hover:bg-purple-700 transition">Simpan & Mulakan Minggu Baru (Manual)</button>
+            <button id="admin-rollover-btn" class="bg-purple-600 text-white px-5 py-2 rounded-lg shadow hover:bg-purple-700 transition">Simpan &amp; Mulakan Minggu Baru (Manual)</button>
           </div>
 
           <div class="mt-4">
@@ -243,6 +277,36 @@
             <input type="text" id="week-label-input" class="p-2 border border-gray-300 rounded-lg shadow-sm w-full md:w-64">
             <button id="week-label-save-btn" class="ml-0 md:ml-2 mt-2 md:mt-0 bg-indigo-600 text-white px-4 py-2 rounded-lg shadow hover:bg-indigo-700 transition">Simpan Label</button>
           </div>
+
+          <!-- MAINTENANCE SLOT -->
+          <div class="mt-6 p-4 border border-red-300 rounded-lg bg-red-50">
+            <h3 class="text-lg font-semibold text-red-700 mb-2">Maintenance Slot</h3>
+            <p class="text-xs text-red-700 mb-3">
+              Slot yang ditandakan sebagai <strong>maintenance</strong> akan dikunci dan berwarna kelabu (tidak boleh ditempah).
+            </p>
+            <div class="flex flex-wrap items-center gap-2 mb-2">
+              <label class="text-sm text-gray-700">Hari:</label>
+              <select id="maintenance-day-select" class="border border-gray-300 rounded-md p-1 text-sm">
+                <option value="mo">Isnin (Mo)</option>
+                <option value="tu">Selasa (Tu)</option>
+                <option value="we">Rabu (We)</option>
+                <option value="th">Khamis (Th)</option>
+                <option value="fr">Jumaat (Fr)</option>
+              </select>
+
+              <label class="text-sm text-gray-700 ml-2">Waktu:</label>
+              <select id="maintenance-period-select" class="border border-gray-300 rounded-md p-1 text-sm">
+                <!-- Diisi melalui JS: W1..W12 -->
+              </select>
+
+              <button id="maintenance-toggle-btn" class="ml-2 bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm shadow hover:bg-red-700">
+                Tutup / Buka Slot
+              </button>
+            </div>
+            <p id="maintenance-status-text" class="mt-2 text-xs text-gray-700 whitespace-pre-line">
+              Tiada slot maintenance (semua aktif).
+            </p>
+          </div>
         </div>
 
         <!-- Weekly Archive -->
@@ -250,6 +314,12 @@
           <h3 class="text-xl font-semibold text-gray-700 mb-4">Arkib Mingguan</h3>
           <div id="archive-list" class="max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-3 space-y-2">
             <p class="text-gray-500">Tiada arkib ditemui.</p>
+          </div>
+
+          <!-- Paparan komen arkib -->
+          <div id="archive-comment-box" class="mt-4 p-3 border border-dashed border-gray-300 rounded-lg bg-white">
+            <p class="font-semibold text-sm text-gray-700 mb-1">Komen Minggu Dipilih:</p>
+            <pre id="archive-comment-text" class="whitespace-pre-wrap text-xs sm:text-sm text-gray-800">Tiada arkib dipilih.</pre>
           </div>
         </div>
 
@@ -274,7 +344,9 @@
       saveWeekStartToDB,
       saveWeekLabelToDB,
       saveOptionsToDB,
-      saveLastRolloverDateToDB
+      saveLastRolloverDateToDB,
+      saveWeekCommentsToDB,
+      saveMaintenanceToDB
     } from './database.js';
 
     dayjs.extend(dayjs_plugin_isoWeek);
@@ -324,6 +396,8 @@
     let lastRolloverDate = null;
     let archiveViewIndex = -1;
     let autoSaveTimer = null;
+    let currentWeekComments = '';
+    let maintenance = {};
 
     // DOM refs
     const tableHeader = document.querySelector("#schedule-table thead tr");
@@ -346,6 +420,7 @@
     const printBtn = document.getElementById("print-schedule-btn");
     const csvBtn = document.getElementById("download-csv-btn");
     const excelBtn = document.getElementById("download-excel-btn");
+    const copyTableBtn = document.getElementById("copy-table-btn");
     const adminClearBtn = document.getElementById("admin-clear-btn");
     const adminRolloverBtn = document.getElementById("admin-rollover-btn");
     const manualDateInput = document.getElementById("manual-date-input");
@@ -363,6 +438,20 @@
 
     const printTable = document.getElementById("print-table");
 
+    const toggleCommentsBtn = document.getElementById("toggle-comments-btn");
+    const commentsPanel = document.getElementById("comments-panel");
+    const weekCommentsInput = document.getElementById("week-comments-input");
+    const saveCommentsBtn = document.getElementById("save-comments-btn");
+
+    const maintenanceDaySelect = document.getElementById("maintenance-day-select");
+    const maintenancePeriodSelect = document.getElementById("maintenance-period-select");
+    const maintenanceToggleBtn = document.getElementById("maintenance-toggle-btn");
+    const maintenanceStatusText = document.getElementById("maintenance-status-text");
+
+    const archiveCommentBox = document.getElementById("archive-comment-box");
+    const archiveCommentText = document.getElementById("archive-comment-text");
+
+    // ==== HELPER ====
     function showToast(message, isError = false) {
       toast.textContent = message;
       toast.className = `fixed bottom-5 right-5 px-6 py-3 rounded-lg shadow-xl transition-transform transform ${isError ? 'bg-red-600' : 'bg-green-600'} text-white`;
@@ -396,6 +485,14 @@
       return data;
     }
 
+    function createEmptyMaintenance() {
+      const m = {};
+      Object.keys(DAYS_MAP).forEach(dayKey => {
+        m[dayKey] = {};
+      });
+      return m;
+    }
+
     function applySelectColor(selectElement) {
       const value = selectElement.value;
       const type = selectElement.dataset.type;
@@ -407,6 +504,7 @@
       selectElement.style.backgroundColor = color;
     }
 
+    // ==== OPTIONS (CLASS/SUBJECT) ====
     function loadOptionsFromData(classOptsFromDB, subjectOptsFromDB) {
       if (Array.isArray(classOptsFromDB) && classOptsFromDB.length) {
         CLASS_OPTIONS = classOptsFromDB;
@@ -435,6 +533,7 @@
       tableBody.innerHTML = '';
       initTableStructure();
       renderSchedule(currentSchedule, archiveViewIndex !== -1);
+      applyMaintenanceToTable();
       hideLoading();
     }
 
@@ -444,6 +543,7 @@
       weekLabelInput.value = currentWeekLabel || '';
     }
 
+    // ==== TABLE STRUCTURE ====
     function createDropdown(type, day, period) {
       const select = document.createElement("select");
       select.className = "w-full p-1 border-0 rounded-md shadow-sm focus:ring-1 focus:ring-blue-500 transition-all duration-200 mb-1";
@@ -476,6 +576,17 @@
         th.innerHTML = `<div class="font-bold text-white">W${index + 1}</div><div class="font-normal text-teal-100">${time}</div>`;
         tableHeader.appendChild(th);
       });
+
+      // Isi pilihan W1..W12 untuk maintenance
+      if (maintenancePeriodSelect) {
+        maintenancePeriodSelect.innerHTML = "";
+        for (let i = 1; i <= PERIODS_COUNT; i++) {
+          const opt = document.createElement("option");
+          opt.value = String(i);
+          opt.textContent = `W${i}`;
+          maintenancePeriodSelect.appendChild(opt);
+        }
+      }
 
       Object.keys(DAYS_MAP).forEach(dayKey => {
         const day = DAYS_MAP[dayKey];
@@ -513,6 +624,7 @@
       });
     }
 
+    // ==== RENDERING ====
     function renderWeekDate() {
       if (!currentWeekStart) {
         currentWeekStart = getDefaultWeekStart();
@@ -586,8 +698,18 @@
 
           classSelect.disabled = isArchive;
           subjectSelect.disabled = isArchive;
+          if (isArchive) {
+            classSelect.classList.add("cursor-not-allowed");
+            subjectSelect.classList.add("cursor-not-allowed");
+          } else {
+            classSelect.classList.remove("cursor-not-allowed");
+            subjectSelect.classList.remove("cursor-not-allowed");
+          }
         }
       });
+
+      // Selepas render, apply maintenance
+      applyMaintenanceToTable();
     }
 
     async function saveScheduleToServer(showMessage = true) {
@@ -600,6 +722,68 @@
       }
     }
 
+    // ==== MAINTENANCE ====
+    function applyMaintenanceToTable() {
+      if (!maintenance || !tableBody) return;
+
+      Object.keys(DAYS_MAP).forEach(dayKey => {
+        for (let i = 1; i <= PERIODS_COUNT; i++) {
+          const cell = tableBody.querySelector(`td[data-day='${dayKey}'][data-period='${i}']`);
+          if (!cell) continue;
+          const classSelect = cell.querySelector("select[data-type='class']");
+          const subjectSelect = cell.querySelector("select[data-type='subject']");
+          const isDisabled = maintenance[dayKey] && maintenance[dayKey][i];
+
+          if (isDisabled) {
+            cell.classList.add("bg-gray-300", "opacity-70");
+            if (classSelect) {
+              classSelect.disabled = true;
+              classSelect.classList.add("cursor-not-allowed");
+            }
+            if (subjectSelect) {
+              subjectSelect.disabled = true;
+              subjectSelect.classList.add("cursor-not-allowed");
+            }
+          } else {
+            cell.classList.remove("bg-gray-300", "opacity-70");
+            if (archiveViewIndex === -1) {
+              if (classSelect) {
+                classSelect.disabled = false;
+                classSelect.classList.remove("cursor-not-allowed");
+              }
+              if (subjectSelect) {
+                subjectSelect.disabled = false;
+                subjectSelect.classList.remove("cursor-not-allowed");
+              }
+            }
+          }
+        }
+      });
+    }
+
+    async function saveMaintenanceToServer() {
+      await saveMaintenanceToDB(maintenance);
+    }
+
+    function updateMaintenanceStatusText() {
+      if (!maintenanceStatusText) return;
+      const lines = [];
+      Object.keys(DAYS_MAP).forEach(dayKey => {
+        const periods = maintenance[dayKey] ? Object.keys(maintenance[dayKey]).filter(p => maintenance[dayKey][p]) : [];
+        if (periods.length > 0) {
+          const label = DAYS_MAP[dayKey].label;
+          const list = periods.map(p => `W${p}`).join(", ");
+          lines.push(`${label}: ${list}`);
+        }
+      });
+      if (lines.length === 0) {
+        maintenanceStatusText.textContent = "Tiada slot maintenance (semua aktif).";
+      } else {
+        maintenanceStatusText.textContent = "Slot dalam maintenance:\n" + lines.join("\n");
+      }
+    }
+
+    // ==== ADMIN MODAL ====
     function openAdminModal() {
       adminModal.style.display = 'flex';
       adminPassword.value = '';
@@ -619,14 +803,22 @@
         adminPanelView.style.display = 'block';
         renderArchiveList();
         initDropdownEditors();
+        updateMaintenanceStatusText();
+        if (archiveCommentText) {
+          archiveCommentText.textContent = "Tiada arkib dipilih.";
+        }
       } else {
         loginError.style.display = 'block';
       }
     }
 
+    // ==== ARKIB ====
     function renderArchiveList() {
       if (!weeklyArchive || weeklyArchive.length === 0) {
         archiveListContainer.innerHTML = '<p class="text-gray-500">Tiada arkib ditemui.</p>';
+        if (archiveCommentText) {
+          archiveCommentText.textContent = "Tiada arkib dipilih.";
+        }
         return;
       }
       archiveListContainer.innerHTML = '';
@@ -680,8 +872,14 @@
       const endDate = dayjs(entry.startDate).add(4, 'day').format("D MMM YYYY").toUpperCase();
       weekDateDisplay.textContent = `ARKIB: ${startDate} - ${endDate}`;
 
+      if (archiveCommentText) {
+        archiveCommentText.textContent = entry.comments && entry.comments.trim()
+          ? entry.comments
+          : "Tiada komen untuk minggu ini.";
+      }
+
       updateArchiveNav();
-      closeAdminModal();
+      // Tidak tutup admin modal supaya komen boleh dibaca dalam panel
     }
 
     function navigateArchive(direction) {
@@ -697,12 +895,20 @@
       if (archiveViewIndex === -1) {
         renderSchedule(currentSchedule, false);
         renderWeekDate();
+        if (archiveCommentText) {
+          archiveCommentText.textContent = "Tiada arkib dipilih.";
+        }
       } else {
         const entry = weeklyArchive[archiveViewIndex];
         renderSchedule(entry.schedule, true);
         const startDate = dayjs(entry.startDate).format("D");
         const endDate = dayjs(entry.startDate).add(4, 'day').format("D MMM YYYY").toUpperCase();
         weekDateDisplay.textContent = `ARKIB: ${startDate} - ${endDate}`;
+        if (archiveCommentText) {
+          archiveCommentText.textContent = entry.comments && entry.comments.trim()
+            ? entry.comments
+            : "Tiada komen untuk minggu ini.";
+        }
       }
       updateArchiveNav();
     }
@@ -735,6 +941,7 @@
       }
     }
 
+    // ==== ROLLOVER (Sabtu + manual) ====
     async function handleRollover(isManual) {
       if (!currentWeekStart) {
         currentWeekStart = getDefaultWeekStart();
@@ -749,12 +956,14 @@
         label: archiveLabel,
         weekLabel: currentWeekLabel || '',
         startDate: currentWeekStart.format("YYYY-MM-DD"),
-        schedule: currentSchedule
+        schedule: currentSchedule,
+        comments: currentWeekComments || ""
       };
 
       weeklyArchive.unshift(archiveEntry);
       await saveArchiveToDB(weeklyArchive);
 
+      // reset jadual & komen untuk minggu baharu
       currentSchedule = createEmptySchedule();
       await saveScheduleToServer(false);
 
@@ -764,9 +973,19 @@
       currentWeekLabel = '';
       await saveWeekLabelToDB(currentWeekLabel);
 
+      currentWeekComments = '';
+      await saveWeekCommentsToDB("");
+      if (weekCommentsInput) {
+        weekCommentsInput.value = "";
+      }
+
       renderWeekDate();
       renderSchedule(currentSchedule, false);
       updateArchiveNav();
+
+      if (archiveCommentText) {
+        archiveCommentText.textContent = "Tiada arkib dipilih.";
+      }
 
       if (isManual) {
         showToast("Jadual telah diarkib & minggu baru dimulakan!");
@@ -792,6 +1011,7 @@
       }
     }
 
+    // ==== EKSPORT, COPY & CETAK ====
     function getDisplayedScheduleData() {
       if (archiveViewIndex === -1) {
         return currentSchedule;
@@ -865,6 +1085,54 @@
       showToast("Excel dimuat turun!");
     }
 
+    async function copyTableToClipboard() {
+      const data = getDisplayedScheduleData();
+      if (!data) {
+        showToast("Tiada data untuk disalin.", true);
+        return;
+      }
+
+      const lines = [];
+      const header = ["Hari/Waktu"].concat(
+        PERIOD_TIMES.map((time, i) => `W${i + 1} (${time})`)
+      );
+      lines.push(header.join(" | "));
+
+      Object.keys(DAYS_MAP).forEach(dayKey => {
+        const dayLabel = DAYS_MAP[dayKey].label;
+        const row = [dayLabel];
+        for (let i = 1; i <= PERIODS_COUNT; i++) {
+          const cellData = data[dayKey]?.[i] || { class: '', subject: '' };
+          const cellValue = `${cellData.class || ''}${cellData.subject ? '/' + cellData.subject : ''}`;
+          row.push(cellValue || "-");
+        }
+        lines.push(row.join(" | "));
+      });
+
+      const text = lines.join("\n");
+
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const textarea = document.createElement("textarea");
+          textarea.value = text;
+          textarea.style.position = "fixed";
+          textarea.style.top = "-1000px";
+          textarea.style.left = "-1000px";
+          document.body.appendChild(textarea);
+          textarea.focus();
+          textarea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textarea);
+        }
+        showToast("Jadual telah disalin ke clipboard!");
+      } catch (err) {
+        console.error(err);
+        showToast("Gagal menyalin jadual.", true);
+      }
+    }
+
     function printSchedule() {
       printTable.innerHTML = '';
       const mainTable = document.getElementById('schedule-table');
@@ -875,6 +1143,7 @@
       window.print();
     }
 
+    // ==== EVENT LISTENERS ====
     function initEventListeners() {
       tableBody.addEventListener("change", (event) => {
         if (event.target && event.target.tagName === 'SELECT') {
@@ -894,6 +1163,36 @@
 
       archivePrevBtn.addEventListener("click", () => navigateArchive(1));
       archiveNextBtn.addEventListener("click", () => navigateArchive(-1));
+
+      // Komen guru toggle
+      toggleCommentsBtn.addEventListener("click", () => {
+        commentsPanel.classList.toggle("hidden");
+      });
+
+      saveCommentsBtn.addEventListener("click", async () => {
+        currentWeekComments = weekCommentsInput.value;
+        await saveWeekCommentsToDB(currentWeekComments);
+        showToast("Komen guru minggu ini telah disimpan!");
+      });
+
+      // Maintenance toggle
+      maintenanceToggleBtn.addEventListener("click", async () => {
+        const day = maintenanceDaySelect.value;
+        const period = parseInt(maintenancePeriodSelect.value, 10);
+
+        if (!maintenance[day]) maintenance[day] = {};
+        const currentlyDisabled = !!maintenance[day][period];
+        if (currentlyDisabled) {
+          delete maintenance[day][period];
+        } else {
+          maintenance[day][period] = true;
+        }
+
+        applyMaintenanceToTable();
+        updateMaintenanceStatusText();
+        await saveMaintenanceToServer();
+        showToast(currentlyDisabled ? "Slot dibuka semula." : "Slot ditutup (maintenance).");
+      });
     }
 
     function updateScheduleDataFromTable() {
@@ -919,6 +1218,7 @@
       printBtn.addEventListener("click", printSchedule);
       csvBtn.addEventListener("click", exportCSV);
       excelBtn.addEventListener("click", exportXLSX);
+      copyTableBtn.addEventListener("click", copyTableToClipboard);
 
       adminClearBtn.addEventListener("click", async () => {
         if (confirm("Anda pasti mahu kosongkan semua data jadual minggu ini? Tindakan ini tidak boleh diundur.")) {
@@ -965,6 +1265,7 @@
       });
     }
 
+    // ==== INIT APP ====
     async function init() {
       showLoading("Memuatkan data...");
       try {
@@ -992,6 +1293,21 @@
         renderWeekDate();
         renderSchedule(currentSchedule, false);
         updateArchiveNav();
+
+        maintenance = initial.maintenance && typeof initial.maintenance === 'object'
+          ? initial.maintenance
+          : createEmptyMaintenance();
+        applyMaintenanceToTable();
+        updateMaintenanceStatusText();
+
+        currentWeekComments = initial.weekComments || "";
+        if (weekCommentsInput) {
+          weekCommentsInput.value = currentWeekComments;
+        }
+
+        if (archiveCommentText) {
+          archiveCommentText.textContent = "Tiada arkib dipilih.";
+        }
 
         initEventListeners();
         initAdminPanel();

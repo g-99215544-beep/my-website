@@ -1,5 +1,5 @@
 // ==========================================
-// database.js — Firebase Module (Stable + Comments + Maintenance)
+// database.js — Firebase Module (Stable + Chat Comments + Maintenance)
 // ==========================================
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
@@ -39,8 +39,8 @@ const PATHS = {
   classOptions: "classOptions",
   subjectOptions: "subjectOptions",
   lastRolloverDate: "lastRolloverDate",
-  weekComments: "weekComments",     // komen minggu semasa
-  maintenance: "maintenance"        // slot maintenance (tutup)
+  weekComments: "weekComments",     // chat minggu semasa (array)
+  maintenance: "maintenance"        // slot maintenance
 };
 
 // ==============================
@@ -71,7 +71,9 @@ export async function loadInitialData() {
     classOptions: data[PATHS.classOptions] || [],
     subjectOptions: data[PATHS.subjectOptions] || [],
     lastRolloverDate: data[PATHS.lastRolloverDate] || null,
-    weekComments: data[PATHS.weekComments] || "",
+    // Chat minggu semasa (array mesej)
+    weekComments: data[PATHS.weekComments] || [],
+    // Peta maintenance (hari -> period -> true/false)
     maintenance: data[PATHS.maintenance] || null
   };
 }
@@ -146,11 +148,12 @@ export async function saveLastRolloverDateToDB(dateString) {
 }
 
 // ==============================
-// Simpan Komen Minggu Semasa
+// Simpan CHAT minggu semasa
+// weekComments = [{id, name, text, time}, ...]
 // ==============================
-export async function saveWeekCommentsToDB(commentsText) {
+export async function saveWeekCommentsToDB(commentsArray) {
   try {
-    await set(ref(db, PATHS.weekComments), commentsText || "");
+    await set(ref(db, PATHS.weekComments), commentsArray || []);
   } catch (err) {
     console.error("❌ Error simpan weekComments:", err);
   }

@@ -1,8 +1,7 @@
 // ==========================================
-// database.js — Firebase Module (Stable)
+// database.js — Firebase Module (Stable + Comments + Maintenance)
 // ==========================================
 
-// Firebase SDK
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
 import {
   getDatabase,
@@ -39,7 +38,9 @@ const PATHS = {
   weekLabel: "weekLabel",
   classOptions: "classOptions",
   subjectOptions: "subjectOptions",
-  lastRolloverDate: "lastRolloverDate"
+  lastRolloverDate: "lastRolloverDate",
+  weekComments: "weekComments",     // komen minggu semasa
+  maintenance: "maintenance"        // slot maintenance (tutup)
 };
 
 // ==============================
@@ -69,7 +70,9 @@ export async function loadInitialData() {
     weekLabel: data[PATHS.weekLabel] || "",
     classOptions: data[PATHS.classOptions] || [],
     subjectOptions: data[PATHS.subjectOptions] || [],
-    lastRolloverDate: data[PATHS.lastRolloverDate] || null
+    lastRolloverDate: data[PATHS.lastRolloverDate] || null,
+    weekComments: data[PATHS.weekComments] || "",
+    maintenance: data[PATHS.maintenance] || null
   };
 }
 
@@ -139,5 +142,27 @@ export async function saveLastRolloverDateToDB(dateString) {
     await set(ref(db, PATHS.lastRolloverDate), dateString || null);
   } catch (err) {
     console.error("❌ Error simpan lastRolloverDate:", err);
+  }
+}
+
+// ==============================
+// Simpan Komen Minggu Semasa
+// ==============================
+export async function saveWeekCommentsToDB(commentsText) {
+  try {
+    await set(ref(db, PATHS.weekComments), commentsText || "");
+  } catch (err) {
+    console.error("❌ Error simpan weekComments:", err);
+  }
+}
+
+// ==============================
+// Simpan Peta Maintenance Slot
+// ==============================
+export async function saveMaintenanceToDB(maintenanceObj) {
+  try {
+    await set(ref(db, PATHS.maintenance), maintenanceObj || {});
+  } catch (err) {
+    console.error("❌ Error simpan maintenance:", err);
   }
 }

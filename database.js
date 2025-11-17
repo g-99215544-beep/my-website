@@ -1,6 +1,8 @@
-// database.js
-// Modul untuk urus Firebase Realtime Database
+// ==========================================
+// database.js — Firebase Module (Stable)
+// ==========================================
 
+// Firebase SDK
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
 import {
   getDatabase,
@@ -10,7 +12,9 @@ import {
   update
 } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
 
-// Konfigurasi dari cikgu
+// ==============================
+// FIREBASE CONFIG — MILIK CIKGU
+// ==============================
 const firebaseConfig = {
   apiKey: "AIzaSyAJ-eGCASGs7ZWoHtFgzcfcc2Y30jt_CWo",
   authDomain: "jadual-makmal-sksa.firebaseapp.com",
@@ -25,16 +29,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// Lokasi data dalam Realtime Database
-// Struktur di root:
-// currentSchedule: {...}
-// archive: [...]
-//
-// weekStart: "YYYY-MM-DD"
-// weekLabel: "M32" / "Minggu 2" / dll
-// classOptions: ["", "1B", ...]
-// subjectOptions: ["", "SJ", ...]
-// lastRolloverDate: "YYYY-MM-DD"
+// ==============================
+// PATH DALAM Realtime Database
+// ==============================
 const PATHS = {
   schedule: "currentSchedule",
   archive: "archive",
@@ -45,32 +42,23 @@ const PATHS = {
   lastRolloverDate: "lastRolloverDate"
 };
 
-// Helper: baca root data sekaligus
+// ==============================
+// Helper: Baca root database
+// ==============================
 async function readRoot() {
-  const rootRef = ref(db, "/");
-  const snap = await get(rootRef);
-  if (snap.exists()) {
-    return snap.val();
+  try {
+    const rootRef = ref(db, "/");
+    const snap = await get(rootRef);
+    return snap.exists() ? snap.val() : {};
+  } catch (err) {
+    console.error("❌ Firebase readRoot error:", err);
+    return {};
   }
-  return {};
 }
 
-// === EXPORT FUNCTIONS ===
-
-/**
- * loadInitialData()
- * Dipanggil sekali masa init() dalam index.html
- * Return:
- * {
- *   schedule,
- *   archive,
- *   weekStart,
- *   weekLabel,
- *   classOptions,
- *   subjectOptions,
- *   lastRolloverDate
- * }
- */
+// ==============================
+// EXPORT: loadInitialData()
+// ==============================
 export async function loadInitialData() {
   const data = await readRoot();
 
@@ -79,46 +67,77 @@ export async function loadInitialData() {
     archive: data[PATHS.archive] || [],
     weekStart: data[PATHS.weekStart] || null,
     weekLabel: data[PATHS.weekLabel] || "",
-    classOptions: data[PATHS.classOptions] || null,
-    subjectOptions: data[PATHS.subjectOptions] || null,
+    classOptions: data[PATHS.classOptions] || [],
+    subjectOptions: data[PATHS.subjectOptions] || [],
     lastRolloverDate: data[PATHS.lastRolloverDate] || null
   };
 }
 
-// Simpan jadual semasa
+// ==============================
+// Simpan Jadual Mingguan
+// ==============================
 export async function saveScheduleToDB(scheduleObj) {
-  const scheduleRef = ref(db, PATHS.schedule);
-  await set(scheduleRef, scheduleObj || {});
+  try {
+    await set(ref(db, PATHS.schedule), scheduleObj || {});
+  } catch (err) {
+    console.error("❌ Error simpan jadual:", err);
+  }
 }
 
-// Simpan keseluruhan arkib (array)
+// ==============================
+// Simpan Arkib Mingguan
+// ==============================
 export async function saveArchiveToDB(archiveArray) {
-  const archiveRef = ref(db, PATHS.archive);
-  await set(archiveRef, archiveArray || []);
+  try {
+    await set(ref(db, PATHS.archive), archiveArray || []);
+  } catch (err) {
+    console.error("❌ Error simpan arkib:", err);
+  }
 }
 
-// Simpan tarikh mula minggu (Isnin)
-export async function saveWeekStartToDB(isoDateString) {
-  const weekStartRef = ref(db, PATHS.weekStart);
-  await set(weekStartRef, isoDateString || null);
+// ==============================
+// Simpan Tarikh Mula Minggu
+// ==============================
+export async function saveWeekStartToDB(dateString) {
+  try {
+    await set(ref(db, PATHS.weekStart), dateString || null);
+  } catch (err) {
+    console.error("❌ Error simpan weekStart:", err);
+  }
 }
 
-// Simpan label minggu semasa (cth: "M32", "Minggu 2")
+// ==============================
+// Simpan Label Minggu
+// ==============================
 export async function saveWeekLabelToDB(label) {
-  const weekLabelRef = ref(db, PATHS.weekLabel);
-  await set(weekLabelRef, label || "");
+  try {
+    await set(ref(db, PATHS.weekLabel), label || "");
+  } catch (err) {
+    console.error("❌ Error simpan weekLabel:", err);
+  }
 }
 
-// Simpan pilihan class & subject (array)
+// ==============================
+// Simpan Pilihan Dropdown
+// ==============================
 export async function saveOptionsToDB(classOptions, subjectOptions) {
-  const updates = {};
-  updates[PATHS.classOptions] = classOptions || [];
-  updates[PATHS.subjectOptions] = subjectOptions || [];
-  await update(ref(db, "/"), updates);
+  try {
+    await update(ref(db, "/"), {
+      [PATHS.classOptions]: classOptions || [],
+      [PATHS.subjectOptions]: subjectOptions || []
+    });
+  } catch (err) {
+    console.error("❌ Error simpan options:", err);
+  }
 }
 
-// Simpan tarikh rollover terakhir (Sabtu)
-export async function saveLastRolloverDateToDB(isoDateString) {
-  const lastRef = ref(db, PATHS.lastRolloverDate);
-  await set(lastRef, isoDateString || null);
+// ==============================
+// Simpan Tarikh Auto-Rollover
+// ==============================
+export async function saveLastRolloverDateToDB(dateString) {
+  try {
+    await set(ref(db, PATHS.lastRolloverDate), dateString || null);
+  } catch (err) {
+    console.error("❌ Error simpan lastRolloverDate:", err);
+  }
 }

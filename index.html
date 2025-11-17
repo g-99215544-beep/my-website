@@ -85,9 +85,6 @@
       display: none;
     }
 
-    /* ============================
-       FIX MOBILE VIEW (keadaan stabil)
-       ============================ */
     @media (max-width: 480px) {
       table {
         font-size: 11px !important;
@@ -140,30 +137,45 @@
       </div>
     </header>
 
-    <!-- KOMEN GURU (COLLAPSIBLE) -->
+    <!-- KOMEN GURU (CHAT) -->
     <div id="comments-panel" class="no-print hidden mb-4">
       <div class="border border-amber-300 bg-amber-50 rounded-xl p-3 sm:p-4">
         <div class="flex justify-between items-center mb-2">
           <h3 class="text-sm sm:text-base font-semibold text-amber-800">
-            Komen Guru Minggu Ini
+            Chat Komen Guru (Minggu Ini)
           </h3>
           <span class="text-[11px] sm:text-xs text-amber-700">
-            Komen ini hanya untuk <strong>minggu semasa</strong>
+            Chat ini reset bila minggu baru, tetapi disimpan dalam Arkib.
           </span>
         </div>
-        <textarea
-          id="week-comments-input"
-          rows="4"
-          class="w-full text-sm p-2 border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
-          placeholder="Contoh: Laptop 4 rosak keyboard, Mouse hilang, wifi perlahan..."
-        ></textarea>
-        <div class="mt-2 flex justify-end">
-          <button
-            id="save-comments-btn"
-            class="bg-amber-600 text-white px-4 py-2 rounded-lg shadow hover:bg-amber-700 text-sm"
+
+        <!-- LOG CHAT -->
+        <div id="week-comments-log" class="bg-white border border-amber-200 rounded-lg p-2 max-h-48 overflow-y-auto text-sm space-y-1">
+          <p class="text-gray-400 text-sm">Tiada komen lagi untuk minggu ini.</p>
+        </div>
+
+        <!-- INPUT CHAT -->
+        <div class="mt-3 space-y-2">
+          <input
+            id="week-comment-name"
+            type="text"
+            class="w-full border border-amber-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+            placeholder="Nama guru (cth: Cikgu Sufian)"
           >
-            Simpan Komen
-          </button>
+          <div class="flex gap-2 items-stretch">
+            <textarea
+              id="week-comment-input"
+              rows="2"
+              class="flex-1 border border-amber-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+              placeholder="Tulis komen di sini..."
+            ></textarea>
+            <button
+              id="send-comment-btn"
+              class="bg-amber-600 text-white px-4 py-2 rounded-lg shadow hover:bg-amber-700 text-sm self-end"
+            >
+              Hantar
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -318,7 +330,7 @@
 
           <!-- Paparan komen arkib -->
           <div id="archive-comment-box" class="mt-4 p-3 border border-dashed border-gray-300 rounded-lg bg-white">
-            <p class="font-semibold text-sm text-gray-700 mb-1">Komen Minggu Dipilih:</p>
+            <p class="font-semibold text-sm text-gray-700 mb-1">Chat Komen Minggu Dipilih:</p>
             <pre id="archive-comment-text" class="whitespace-pre-wrap text-xs sm:text-sm text-gray-800">Tiada arkib dipilih.</pre>
           </div>
         </div>
@@ -396,7 +408,7 @@
     let lastRolloverDate = null;
     let archiveViewIndex = -1;
     let autoSaveTimer = null;
-    let currentWeekComments = '';
+    let currentWeekComments = [];  // CHAT minggu semasa (array mesej)
     let maintenance = {};
 
     // DOM refs
@@ -440,15 +452,16 @@
 
     const toggleCommentsBtn = document.getElementById("toggle-comments-btn");
     const commentsPanel = document.getElementById("comments-panel");
-    const weekCommentsInput = document.getElementById("week-comments-input");
-    const saveCommentsBtn = document.getElementById("save-comments-btn");
+    const weekCommentsLog = document.getElementById("week-comments-log");
+    const weekCommentNameInput = document.getElementById("week-comment-name");
+    const weekCommentTextInput = document.getElementById("week-comment-input");
+    const sendCommentBtn = document.getElementById("send-comment-btn");
 
     const maintenanceDaySelect = document.getElementById("maintenance-day-select");
     const maintenancePeriodSelect = document.getElementById("maintenance-period-select");
     const maintenanceToggleBtn = document.getElementById("maintenance-toggle-btn");
     const maintenanceStatusText = document.getElementById("maintenance-status-text");
 
-    const archiveCommentBox = document.getElementById("archive-comment-box");
     const archiveCommentText = document.getElementById("archive-comment-text");
 
     // ==== HELPER ====
@@ -502,6 +515,79 @@
         color = colors[value] || DEFAULT_BG;
       }
       selectElement.style.backgroundColor = color;
+    }
+
+    // ==== CHAT RENDERING ====
+    function renderWeekCommentsLog() {
+      if (!weekCommentsLog) return;
+      weekCommentsLog.innerHTML = '';
+
+      if (!currentWeekComments || currentWeekComments.length === 0) {
+        const p = document.createElement('p');
+        p.className = 'text-gray-400 text-sm';
+        p.textContent = 'Tiada komen lagi untuk minggu ini.';
+        weekCommentsLog.appendChild(p);
+        return;
+      }
+
+      currentWeekComments.forEach(msg => {
+        const row = document.createElement('div');
+        row.className = 'flex flex-col bg-amber-100 rounded-lg px-2 py-1 text-sm';
+
+        const header = document.createElement('div');
+        header.className = 'flex justify-between items-center';
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'font-semibold text-amber-900';
+        nameSpan.textContent = msg.name || 'Guru';
+
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'text-[10px] text-amber-700 ml-2';
+        if (msg.time) {
+          timeSpan.textContent = dayjs(msg.time).format('DD/MM HH:mm');
+        } else {
+          timeSpan.textContent = '';
+        }
+
+        header.appendChild(nameSpan);
+        header.appendChild(timeSpan);
+
+        const textP = document.createElement('p');
+        textP.className = 'text-amber-900 text-xs sm:text-sm whitespace-pre-wrap';
+        textP.textContent = msg.text || '';
+
+        row.appendChild(header);
+        row.appendChild(textP);
+
+        weekCommentsLog.appendChild(row);
+      });
+
+      // scroll ke bawah
+      weekCommentsLog.scrollTop = weekCommentsLog.scrollHeight;
+    }
+
+    function formatArchiveComments(entry) {
+      if (!entry || !entry.comments) return "Tiada komen untuk minggu ini.";
+
+      const c = entry.comments;
+      // Jika data lama: string
+      if (typeof c === 'string') {
+        return c.trim() ? c : "Tiada komen untuk minggu ini.";
+      }
+
+      if (Array.isArray(c) && c.length > 0) {
+        const lines = c.map(msg => {
+          const name = msg.name || 'Guru';
+          const text = msg.text || '';
+          let timeStr = '';
+          if (msg.time) {
+            timeStr = dayjs(msg.time).format('DD/MM HH:mm') + ' - ';
+          }
+          return `${timeStr}${name}: ${text}`;
+        });
+        return lines.join('\n');
+      }
+
+      return "Tiada komen untuk minggu ini.";
     }
 
     // ==== OPTIONS (CLASS/SUBJECT) ====
@@ -708,7 +794,6 @@
         }
       });
 
-      // Selepas render, apply maintenance
       applyMaintenanceToTable();
     }
 
@@ -873,13 +958,10 @@
       weekDateDisplay.textContent = `ARKIB: ${startDate} - ${endDate}`;
 
       if (archiveCommentText) {
-        archiveCommentText.textContent = entry.comments && entry.comments.trim()
-          ? entry.comments
-          : "Tiada komen untuk minggu ini.";
+        archiveCommentText.textContent = formatArchiveComments(entry);
       }
 
       updateArchiveNav();
-      // Tidak tutup admin modal supaya komen boleh dibaca dalam panel
     }
 
     function navigateArchive(direction) {
@@ -905,9 +987,7 @@
         const endDate = dayjs(entry.startDate).add(4, 'day').format("D MMM YYYY").toUpperCase();
         weekDateDisplay.textContent = `ARKIB: ${startDate} - ${endDate}`;
         if (archiveCommentText) {
-          archiveCommentText.textContent = entry.comments && entry.comments.trim()
-            ? entry.comments
-            : "Tiada komen untuk minggu ini.";
+          archiveCommentText.textContent = formatArchiveComments(entry);
         }
       }
       updateArchiveNav();
@@ -957,13 +1037,12 @@
         weekLabel: currentWeekLabel || '',
         startDate: currentWeekStart.format("YYYY-MM-DD"),
         schedule: currentSchedule,
-        comments: currentWeekComments || ""
+        comments: Array.isArray(currentWeekComments) ? currentWeekComments : []
       };
 
       weeklyArchive.unshift(archiveEntry);
       await saveArchiveToDB(weeklyArchive);
 
-      // reset jadual & komen untuk minggu baharu
       currentSchedule = createEmptySchedule();
       await saveScheduleToServer(false);
 
@@ -973,11 +1052,10 @@
       currentWeekLabel = '';
       await saveWeekLabelToDB(currentWeekLabel);
 
-      currentWeekComments = '';
-      await saveWeekCommentsToDB("");
-      if (weekCommentsInput) {
-        weekCommentsInput.value = "";
-      }
+      currentWeekComments = [];
+      await saveWeekCommentsToDB(currentWeekComments);
+      renderWeekCommentsLog();
+      if (weekCommentTextInput) weekCommentTextInput.value = '';
 
       renderWeekDate();
       renderSchedule(currentSchedule, false);
@@ -1133,16 +1211,6 @@
       }
     }
 
-    function printSchedule() {
-      printTable.innerHTML = '';
-      const mainTable = document.getElementById('schedule-table');
-      const printHead = mainTable.querySelector('thead').cloneNode(true);
-      const printBody = mainTable.querySelector('tbody').cloneNode(true);
-      printTable.appendChild(printHead);
-      printTable.appendChild(printBody);
-      window.print();
-    }
-
     // ==== EVENT LISTENERS ====
     function initEventListeners() {
       tableBody.addEventListener("change", (event) => {
@@ -1164,15 +1232,40 @@
       archivePrevBtn.addEventListener("click", () => navigateArchive(1));
       archiveNextBtn.addEventListener("click", () => navigateArchive(-1));
 
-      // Komen guru toggle
+      // Toggle panel komen
       toggleCommentsBtn.addEventListener("click", () => {
         commentsPanel.classList.toggle("hidden");
       });
 
-      saveCommentsBtn.addEventListener("click", async () => {
-        currentWeekComments = weekCommentsInput.value;
+      // Hantar chat komen
+      sendCommentBtn.addEventListener("click", async () => {
+        const name = (weekCommentNameInput.value || '').trim() || 'Guru';
+        const text = (weekCommentTextInput.value || '').trim();
+
+        if (!text) {
+          alert("Sila tulis komen dahulu.");
+          return;
+        }
+
+        const msg = {
+          id: Date.now(),
+          name,
+          text,
+          time: new Date().toISOString()
+        };
+        currentWeekComments.push(msg);
         await saveWeekCommentsToDB(currentWeekComments);
-        showToast("Komen guru minggu ini telah disimpan!");
+        renderWeekCommentsLog();
+        weekCommentTextInput.value = '';
+        showToast("Komen dihantar!");
+      });
+
+      // Enter + Ctrl+Enter untuk hantar
+      weekCommentTextInput.addEventListener("keydown", async (e) => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          sendCommentBtn.click();
+        }
       });
 
       // Maintenance toggle
@@ -1300,10 +1393,9 @@
         applyMaintenanceToTable();
         updateMaintenanceStatusText();
 
-        currentWeekComments = initial.weekComments || "";
-        if (weekCommentsInput) {
-          weekCommentsInput.value = currentWeekComments;
-        }
+        // Chat minggu semasa
+        currentWeekComments = Array.isArray(initial.weekComments) ? initial.weekComments : [];
+        renderWeekCommentsLog();
 
         if (archiveCommentText) {
           archiveCommentText.textContent = "Tiada arkib dipilih.";

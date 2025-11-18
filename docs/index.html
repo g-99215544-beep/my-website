@@ -1,1 +1,1419 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jadual Makmal Komputer SK Sri Aman</title>
 
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Day.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/dayjs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/plugin/isoWeek.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/plugin/customParseFormat.min.js"></script>
+
+  <!-- Sheet.js untuk eksport Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <!-- Google Font: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    input[type='number']::-webkit-inner-spin-button,
+    input[type='number']::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type='number'] {
+      -moz-appearance: textfield;
+    }
+
+    @media print {
+      body {
+        font-family: 'Inter', Arial, sans-serif;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .print-container {
+        width: 100%;
+        max-width: 100%;
+        box-shadow: none;
+        border: 1px solid #000;
+        margin: 0;
+        padding: 0;
+        border-radius: 0;
+      }
+      .print-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+      }
+      .print-table th,
+      .print-table td {
+        border: 2px solid #000 !important;
+        padding: 4px;
+        font-size: 10px;
+        text-align: center;
+        height: 60px;
+        vertical-align: top;
+        word-wrap: break-word;
+      }
+      .print-table select {
+        display: none;
+      }
+      .print-value {
+        display: block !important;
+        font-size: 11px;
+        font-weight: bold;
+      }
+
+      .day-mo { background-color: #FFFF00 !important; }
+      .day-tu { background-color: #92D050 !important; }
+      .day-we { background-color: #00B0F0 !important; }
+      .day-th { background-color: #FFC000 !important; }
+      .day-fr { background-color: #FF00FF !important; }
+
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .print-value {
+      display: none;
+    }
+
+    @media (max-width: 480px) {
+      table {
+        font-size: 11px !important;
+      }
+      th {
+        font-size: 10px !important;
+        padding: 4px !important;
+      }
+      td {
+        padding: 2px !important;
+        height: 55px !important;
+        min-width: 60px !important;
+      }
+      td select {
+        font-size: 11px !important;
+        padding: 3px !important;
+      }
+      .overflow-x-auto {
+        overflow-x: scroll !important;
+        -webkit-overflow-scrolling: touch;
+      }
+    }
+  </style>
+</head>
+
+<body class="bg-gray-100 p-4 sm:p-6 md:p-8" style="font-family: 'Inter', sans-serif;">
+
+  <div class="max-w-full mx-auto bg-white rounded-2xl shadow-2xl p-4 sm:p-6 md:p-8 print-container">
+
+    <!-- HEADER -->
+    <header class="flex flex-col sm:flex-row items-center justify-between mb-2 sm:mb-4 pb-4 border-b-2 border-gray-200">
+      <div class="flex items-center mb-3 sm:mb-0">
+        <img src="https://i.imgur.com/AfsVtVG.jpeg" alt="Logo Sekolah" class="h-16 w-16 sm:h-20 sm:w-20 mr-4 rounded-md border-2 border-gray-300 no-print">
+        <div>
+          <h1 class="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">
+            JADUAL MAKMAL KOMPUTER SK SRI AMAN 2025
+          </h1>
+          <p id="week-date-display" class="text-base sm:text-lg text-gray-600 font-medium">
+            TARIKH: -
+          </p>
+        </div>
+      </div>
+      <div class="flex flex-col items-stretch gap-2 no-print">
+        <button id="admin-login-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-700 transition duration-300 font-medium">
+          Panel Admin
+        </button>
+        <button id="toggle-comments-btn" class="bg-amber-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-amber-600 transition duration-300 font-medium text-sm">
+          Komen Guru
+        </button>
+      </div>
+    </header>
+
+    <!-- KOMEN GURU (CHAT) -->
+    <div id="comments-panel" class="no-print hidden mb-4">
+      <div class="border border-amber-300 bg-amber-50 rounded-xl p-3 sm:p-4">
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="text-sm sm:text-base font-semibold text-amber-800">
+            Chat Komen Guru (Minggu Ini)
+          </h3>
+          <span class="text-[11px] sm:text-xs text-amber-700">
+            Chat ini reset bila minggu baru, tetapi disimpan dalam Arkib.
+          </span>
+        </div>
+
+        <!-- LOG CHAT -->
+        <div id="week-comments-log" class="bg-white border border-amber-200 rounded-lg p-2 max-h-48 overflow-y-auto text-sm space-y-1">
+          <p class="text-gray-400 text-sm">Tiada komen lagi untuk minggu ini.</p>
+        </div>
+
+        <!-- INPUT CHAT -->
+        <div class="mt-3 space-y-2">
+          <input
+            id="week-comment-name"
+            type="text"
+            class="w-full border border-amber-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+            placeholder="Nama guru (cth: Cikgu Sufian)"
+          >
+          <div class="flex gap-2 items-stretch">
+            <textarea
+              id="week-comment-input"
+              rows="2"
+              class="flex-1 border border-amber-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+              placeholder="Tulis komen di sini..."
+            ></textarea>
+            <button
+              id="send-comment-btn"
+              class="bg-amber-600 text-white px-4 py-2 rounded-lg shadow hover:bg-amber-700 text-sm self-end"
+            >
+              Hantar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOOLBAR / NAV -->
+    <div class="mb-4 flex flex-wrap gap-2 justify-between items-center no-print">
+      <div class="flex items-center gap-2">
+        <button id="archive-prev" class="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-100 transition shadow-sm" title="Minggu Sebelumnya">&lt;</button>
+        <span id="archive-status" class="text-sm font-medium text-gray-700 w-40 text-center">Minggu Semasa</span>
+        <button id="archive-next" class="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-100 transition shadow-sm" title="Minggu Seterusnya">&gt;</button>
+      </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="overflow-x-auto w-full relative no-print rounded-xl shadow-inner border border-gray-200">
+      <div id="loading-overlay" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-20 rounded-xl" style="display: none;">
+        <span class="text-xl font-medium text-gray-700">Memuatkan...</span>
+      </div>
+      <table id="schedule-table" class="min-w-full border-2 border-black print-table">
+        <thead class="bg-teal-700 text-teal-50">
+          <tr>
+            <th class="w-28 p-2 text-sm font-bold border-2 border-black uppercase">HARI / WAKTU</th>
+          </tr>
+        </thead>
+        <tbody id="schedule-body"></tbody>
+      </table>
+    </div>
+
+    <!-- PRINT-ONLY TABLE (clone) -->
+    <div id="print-view" class="hidden">
+      <table id="print-table" class="min-w-full border-2 border-black print-table"></table>
+    </div>
+
+    <!-- INFO BOX -->
+    <div class="mt-6 sm:mt-8 p-4 sm:p-5 bg-yellow-100 border-l-4 border-yellow-500 rounded-lg shadow-md no-print">
+      <h3 class="text-lg sm:text-xl font-bold text-yellow-800 mb-3">TATACARA PENGGUNAAN LAPTOP</h3>
+      <ol class="list-decimal list-inside text-sm sm:text-base text-gray-700 space-y-2">
+        <li>Guru meminta murid mengambil laptop di rak besi.</li>
+        <li>Pastikan murid mencabut wayar "charger" dengan tertib sebelum mengambil keluar laptop.</li>
+        <li>Buka laptop dan masukkan password: <strong class="font-bold text-red-600">123456</strong>. Jika perlu, murid boleh menggunakan "Mouse" yang ada di dalam meja.</li>
+        <li>Setelah selesai guna, guru perlu memastikan murid mengembalikan laptop di rak besi (charge semula sekiranya murid mampu).</li>
+        <li>Kegagalan berbuat demikian akan membatalkan tempahan guru pada masa akan datang. Terima kasih.</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- ADMIN MODAL -->
+  <div id="admin-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style="display: none;">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-5 sm:p-8">
+      <!-- Login View -->
+      <div id="login-view">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Log Masuk Admin</h2>
+        <div class="mb-4">
+          <label for="admin-password" class="block text-sm font-medium text-gray-700 mb-1">Kata Laluan</label>
+          <input type="password" id="admin-password" class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <p id="login-error" class="text-red-500 text-sm mb-4" style="display: none;">Kata laluan salah.</p>
+        <div class="flex justify-end gap-3">
+          <button id="admin-cancel-btn" class="bg-gray-300 text-gray-800 px-5 py-2 rounded-lg hover:bg-gray-400 transition">Batal</button>
+          <button id="admin-submit-btn" class="bg-blue-600 text-white px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition">Log Masuk</button>
+        </div>
+      </div>
+
+      <!-- Admin Panel View -->
+      <div id="admin-panel-view" style="display: none;">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">Panel Admin</h2>
+
+        <!-- Edit Dropdown Options -->
+        <div class="mb-6 p-4 border border-gray-300 rounded-lg bg-gray-50">
+          <h3 class="text-xl font-semibold text-gray-700 mb-4">Edit Pilihan Dropdown</h3>
+          <p class="text-sm text-gray-600 mb-3">Masukkan pilihan dipisahkan dengan koma (cth: 1B,1C,2B,2C)</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label for="edit-class-options" class="block text-sm font-medium text-gray-700 mb-1">Pilihan Kelas</label>
+              <textarea id="edit-class-options" rows="4" class="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+            <div>
+              <label for="edit-subject-options" class="block text-sm font-medium text-gray-700 mb-1">Pilihan Subjek</label>
+              <textarea id="edit-subject-options" rows="4" class="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+          </div>
+          <button id="save-options-btn" class="mt-4 bg-blue-600 text-white px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition">Simpan Pilihan</button>
+        </div>
+
+        <!-- Admin Actions -->
+        <div class="mb-6 p-4 border border-gray-300 rounded-lg bg-gray-50">
+          <h3 class="text-xl font-semibold text-gray-700 mb-4">Tindakan Admin</h3>
+
+          <div class="flex flex-wrap gap-3 mb-4">
+            <button id="save-schedule-btn" class="bg-blue-500 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-600 transition">Simpan Jadual</button>
+            <button id="print-schedule-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700 transition">Cetak Jadual</button>
+            <button id="download-csv-btn" class="bg-green-500 text-white px-4 py-2 rounded-lg shadow hover:bg-green-600 transition">Muat Turun CSV</button>
+            <button id="download-excel-btn" class="bg-green-700 text-white px-4 py-2 rounded-lg shadow hover:bg-green-800 transition">Muat Turun Excel</button>
+            <button id="copy-table-btn" class="bg-gray-700 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-800 transition">Copy Jadual</button>
+          </div>
+
+          <div class="flex flex-wrap gap-3 border-t pt-4">
+            <button id="admin-clear-btn" class="bg-red-600 text-white px-5 py-2 rounded-lg shadow hover:bg-red-700 transition">Kosongkan Jadual Minggu Ini</button>
+            <button id="admin-rollover-btn" class="bg-purple-600 text-white px-5 py-2 rounded-lg shadow hover:bg-purple-700 transition">Simpan &amp; Mulakan Minggu Baru (Manual)</button>
+          </div>
+
+          <div class="mt-4">
+            <label for="manual-date-input" class="block text-sm font-medium text-gray-700 mb-1">Tukar Tarikh Mula Minggu Semasa (Isnin)</label>
+            <input type="date" id="manual-date-input" class="p-2 border border-gray-300 rounded-lg shadow-sm">
+            <button id="manual-date-btn" class="ml-2 bg-gray-600 text-white px-5 py-2 rounded-lg shadow hover:bg-gray-700 transition">Tetapkan Tarikh</button>
+          </div>
+
+          <!-- Label Minggu Semasa -->
+          <div class="mt-4">
+            <label for="week-label-input" class="block text-sm font-medium text-gray-700 mb-1">Label Minggu Semasa (cth: M32 / Minggu 2)</label>
+            <input type="text" id="week-label-input" class="p-2 border border-gray-300 rounded-lg shadow-sm w-full md:w-64">
+            <button id="week-label-save-btn" class="ml-0 md:ml-2 mt-2 md:mt-0 bg-indigo-600 text-white px-4 py-2 rounded-lg shadow hover:bg-indigo-700 transition">Simpan Label</button>
+          </div>
+
+          <!-- MAINTENANCE SLOT -->
+          <div class="mt-6 p-4 border border-red-300 rounded-lg bg-red-50">
+            <h3 class="text-lg font-semibold text-red-700 mb-2">Maintenance Slot</h3>
+            <p class="text-xs text-red-700 mb-3">
+              Slot yang ditandakan sebagai <strong>maintenance</strong> akan dikunci dan berwarna kelabu (tidak boleh ditempah).
+            </p>
+            <div class="flex flex-wrap items-center gap-2 mb-2">
+              <label class="text-sm text-gray-700">Hari:</label>
+              <select id="maintenance-day-select" class="border border-gray-300 rounded-md p-1 text-sm">
+                <option value="mo">Isnin (Mo)</option>
+                <option value="tu">Selasa (Tu)</option>
+                <option value="we">Rabu (We)</option>
+                <option value="th">Khamis (Th)</option>
+                <option value="fr">Jumaat (Fr)</option>
+              </select>
+
+              <label class="text-sm text-gray-700 ml-2">Waktu:</label>
+              <select id="maintenance-period-select" class="border border-gray-300 rounded-md p-1 text-sm">
+                <!-- Diisi melalui JS: W1..W12 -->
+              </select>
+
+              <button id="maintenance-toggle-btn" class="ml-2 bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm shadow hover:bg-red-700">
+                Tutup / Buka Slot
+              </button>
+            </div>
+            <p id="maintenance-status-text" class="mt-2 text-xs text-gray-700 whitespace-pre-line">
+              Tiada slot maintenance (semua aktif).
+            </p>
+          </div>
+        </div>
+
+        <!-- Weekly Archive -->
+        <div class="mb-6 p-4 border border-gray-300 rounded-lg bg-gray-50">
+          <h3 class="text-xl font-semibold text-gray-700 mb-4">Arkib Mingguan</h3>
+          <div id="archive-list" class="max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-3 space-y-2">
+            <p class="text-gray-500">Tiada arkib ditemui.</p>
+          </div>
+
+          <!-- Paparan komen arkib -->
+          <div id="archive-comment-box" class="mt-4 p-3 border border-dashed border-gray-300 rounded-lg bg-white">
+            <p class="font-semibold text-sm text-gray-700 mb-1">Chat Komen Minggu Dipilih:</p>
+            <pre id="archive-comment-text" class="whitespace-pre-wrap text-xs sm:text-sm text-gray-800">Tiada arkib dipilih.</pre>
+          </div>
+        </div>
+
+        <div class="flex justify-end">
+          <button id="admin-close-btn" class="bg-gray-300 text-gray-800 px-5 py-2 rounded-lg hover:bg-gray-400 transition">Tutup</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast" class="fixed bottom-5 right-5 bg-green-600 text-white px-6 py-3 rounded-lg shadow-xl transition-transform transform translate-x-full"
+       style="display: none; transition: transform 0.3s ease-in-out;">
+  </div>
+
+  <!-- JAVASCRIPT UTAMA -->
+  <script type="module">
+    import {
+      loadInitialData,
+      saveScheduleToDB,
+      saveArchiveToDB,
+      saveWeekStartToDB,
+      saveWeekLabelToDB,
+      saveOptionsToDB,
+      saveLastRolloverDateToDB,
+      saveWeekCommentsToDB,
+      saveMaintenanceToDB
+    } from './database.js';
+
+    dayjs.extend(dayjs_plugin_isoWeek);
+    dayjs.extend(dayjs_plugin_customParseFormat);
+
+    // === KONFIGURASI ===
+    const PERIODS_COUNT = 12;
+    const PERIOD_TIMES = [
+      "7.45-8.15", "8.15-8.45", "8.45-9.15", "9.15-9.40", "9.40-10.10",
+      "10.10-10.40", "10.40-11.10", "11.10-11.40", "11.40-12.10",
+      "12.10-12.40", "12.40-1.10", "1.10-1.40"
+    ];
+
+    const DAYS_MAP = {
+      'mo': { name: 'Monday', label: 'Mo', bg: 'bg-yellow-300 day-mo' },
+      'tu': { name: 'Tuesday', label: 'Tu', bg: 'bg-green-300 day-tu' },
+      'we': { name: 'Wednesday', label: 'We', bg: 'bg-blue-300 day-we' },
+      'th': { name: 'Thursday', label: 'Th', bg: 'bg-orange-300 day-th' },
+      'fr': { name: 'Friday', label: 'Fr', bg: 'bg-pink-300 day-fr' }
+    };
+
+    let CLASS_OPTIONS = ['', '1B', '1C', '2B', '2C', '3B', '3C', '4B', '4C', '5B', '5C', '6B', '6C', 'Other'];
+    let SUBJECT_OPTIONS = ['', 'SJ', 'MT', 'BM', 'BI', 'RBT', 'TMK', 'PI', 'PJPK', 'PSV', 'MZ', 'Other'];
+
+    const CLASS_COLORS = {
+      '1B': '#fed7d7', '1C': '#feebc8',
+      '2B': '#fefcbf', '2C': '#c6f6d5',
+      '3B': '#bee3f8', '3C': '#c3dafe',
+      '4B': '#e9d8fd', '4C': '#fbb6ce',
+      '5B': '#fed7d7', '5C': '#feebc8',
+      '6B': '#fefcbf', '6C': '#c6f6d5',
+      'Other': '#e2e8f0'
+    };
+    const SUBJECT_COLORS = {
+      'SJ': '#fbcfe8', 'MT': '#fde68a', 'BM': '#bbf7d0', 'BI': '#bae6fd',
+      'RBT': '#a5b4fc', 'TMK': '#d8b4fe', 'PI': '#6ee7b7', 'PJPK': '#fda4af',
+      'PSV': '#fca5a5', 'MZ': '#fdba74', 'Other': '#e2e8f0'
+    };
+    const DEFAULT_BG = '#FFFFFF';
+    const ADMIN_PASS = 'admin123';
+
+    // === STATE ===
+    let currentSchedule = {};
+    let weeklyArchive = [];
+    let currentWeekStart = null;
+    let currentWeekLabel = '';
+    let lastRolloverDate = null;
+    let archiveViewIndex = -1;
+    let autoSaveTimer = null;
+    let currentWeekComments = [];  // CHAT minggu semasa (array mesej)
+    let maintenance = {};
+
+    // DOM refs
+    const tableHeader = document.querySelector("#schedule-table thead tr");
+    const tableBody = document.getElementById("schedule-body");
+    const weekDateDisplay = document.getElementById("week-date-display");
+    const loadingOverlay = document.getElementById("loading-overlay");
+    const toast = document.getElementById("toast");
+
+    const adminModal = document.getElementById("admin-modal");
+    const adminLoginBtn = document.getElementById("admin-login-btn");
+    const adminCancelBtn = document.getElementById("admin-cancel-btn");
+    const adminSubmitBtn = document.getElementById("admin-submit-btn");
+    const adminCloseBtn = document.getElementById("admin-close-btn");
+    const loginView = document.getElementById("login-view");
+    const adminPanelView = document.getElementById("admin-panel-view");
+    const adminPassword = document.getElementById("admin-password");
+    const loginError = document.getElementById("login-error");
+
+    const saveBtn = document.getElementById("save-schedule-btn");
+    const printBtn = document.getElementById("print-schedule-btn");
+    const csvBtn = document.getElementById("download-csv-btn");
+    const excelBtn = document.getElementById("download-excel-btn");
+    const copyTableBtn = document.getElementById("copy-table-btn");
+    const adminClearBtn = document.getElementById("admin-clear-btn");
+    const adminRolloverBtn = document.getElementById("admin-rollover-btn");
+    const manualDateInput = document.getElementById("manual-date-input");
+    const manualDateBtn = document.getElementById("manual-date-btn");
+    const archiveListContainer = document.getElementById("archive-list");
+    const editClassOptions = document.getElementById("edit-class-options");
+    const editSubjectOptions = document.getElementById("edit-subject-options");
+    const saveOptionsBtn = document.getElementById("save-options-btn");
+    const weekLabelInput = document.getElementById("week-label-input");
+    const weekLabelSaveBtn = document.getElementById("week-label-save-btn");
+
+    const archiveStatus = document.getElementById("archive-status");
+    const archivePrevBtn = document.getElementById("archive-prev");
+    const archiveNextBtn = document.getElementById("archive-next");
+
+    const printTable = document.getElementById("print-table");
+
+    const toggleCommentsBtn = document.getElementById("toggle-comments-btn");
+    const commentsPanel = document.getElementById("comments-panel");
+    const weekCommentsLog = document.getElementById("week-comments-log");
+    const weekCommentNameInput = document.getElementById("week-comment-name");
+    const weekCommentTextInput = document.getElementById("week-comment-input");
+    const sendCommentBtn = document.getElementById("send-comment-btn");
+
+    const maintenanceDaySelect = document.getElementById("maintenance-day-select");
+    const maintenancePeriodSelect = document.getElementById("maintenance-period-select");
+    const maintenanceToggleBtn = document.getElementById("maintenance-toggle-btn");
+    const maintenanceStatusText = document.getElementById("maintenance-status-text");
+
+    const archiveCommentText = document.getElementById("archive-comment-text");
+
+    // ==== HELPER ====
+    function showToast(message, isError = false) {
+      toast.textContent = message;
+      toast.className = `fixed bottom-5 right-5 px-6 py-3 rounded-lg shadow-xl transition-transform transform ${isError ? 'bg-red-600' : 'bg-green-600'} text-white`;
+      toast.style.display = 'block';
+      toast.style.transform = 'translateX(0)';
+      setTimeout(() => {
+        toast.style.transform = 'translateX(120%)';
+      }, 3000);
+    }
+
+    function showLoading(message = "Memuatkan...") {
+      loadingOverlay.querySelector('span').textContent = message;
+      loadingOverlay.style.display = 'flex';
+    }
+    function hideLoading() {
+      loadingOverlay.style.display = 'none';
+    }
+
+    function getDefaultWeekStart() {
+      return dayjs().isoWeekday(1);
+    }
+
+    function createEmptySchedule() {
+      const data = {};
+      Object.keys(DAYS_MAP).forEach(dayKey => {
+        data[dayKey] = {};
+        for (let i = 1; i <= PERIODS_COUNT; i++) {
+          data[dayKey][i] = { class: '', subject: '' };
+        }
+      });
+      return data;
+    }
+
+    function createEmptyMaintenance() {
+      const m = {};
+      Object.keys(DAYS_MAP).forEach(dayKey => {
+        m[dayKey] = {};
+      });
+      return m;
+    }
+
+    function applySelectColor(selectElement) {
+      const value = selectElement.value;
+      const type = selectElement.dataset.type;
+      let color = DEFAULT_BG;
+      if (value) {
+        const colors = type === 'class' ? CLASS_COLORS : SUBJECT_COLORS;
+        color = colors[value] || DEFAULT_BG;
+      }
+      selectElement.style.backgroundColor = color;
+    }
+
+    // ==== CHAT RENDERING ====
+    function renderWeekCommentsLog() {
+      if (!weekCommentsLog) return;
+      weekCommentsLog.innerHTML = '';
+
+      if (!currentWeekComments || currentWeekComments.length === 0) {
+        const p = document.createElement('p');
+        p.className = 'text-gray-400 text-sm';
+        p.textContent = 'Tiada komen lagi untuk minggu ini.';
+        weekCommentsLog.appendChild(p);
+        return;
+      }
+
+      currentWeekComments.forEach(msg => {
+        const row = document.createElement('div');
+        row.className = 'flex flex-col bg-amber-100 rounded-lg px-2 py-1 text-sm';
+
+        const header = document.createElement('div');
+        header.className = 'flex justify-between items-center';
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'font-semibold text-amber-900';
+        nameSpan.textContent = msg.name || 'Guru';
+
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'text-[10px] text-amber-700 ml-2';
+        if (msg.time) {
+          timeSpan.textContent = dayjs(msg.time).format('DD/MM HH:mm');
+        } else {
+          timeSpan.textContent = '';
+        }
+
+        header.appendChild(nameSpan);
+        header.appendChild(timeSpan);
+
+        const textP = document.createElement('p');
+        textP.className = 'text-amber-900 text-xs sm:text-sm whitespace-pre-wrap';
+        textP.textContent = msg.text || '';
+
+        row.appendChild(header);
+        row.appendChild(textP);
+
+        weekCommentsLog.appendChild(row);
+      });
+
+      // scroll ke bawah
+      weekCommentsLog.scrollTop = weekCommentsLog.scrollHeight;
+    }
+
+    function formatArchiveComments(entry) {
+      if (!entry || !entry.comments) return "Tiada komen untuk minggu ini.";
+
+      const c = entry.comments;
+      // Jika data lama: string
+      if (typeof c === 'string') {
+        return c.trim() ? c : "Tiada komen untuk minggu ini.";
+      }
+
+      if (Array.isArray(c) && c.length > 0) {
+        const lines = c.map(msg => {
+          const name = msg.name || 'Guru';
+          const text = msg.text || '';
+          let timeStr = '';
+          if (msg.time) {
+            timeStr = dayjs(msg.time).format('DD/MM HH:mm') + ' - ';
+          }
+          return `${timeStr}${name}: ${text}`;
+        });
+        return lines.join('\n');
+      }
+
+      return "Tiada komen untuk minggu ini.";
+    }
+
+    // ==== OPTIONS (CLASS/SUBJECT) ====
+    function loadOptionsFromData(classOptsFromDB, subjectOptsFromDB) {
+      if (Array.isArray(classOptsFromDB) && classOptsFromDB.length) {
+        CLASS_OPTIONS = classOptsFromDB;
+      }
+      if (Array.isArray(subjectOptsFromDB) && subjectOptsFromDB.length) {
+        SUBJECT_OPTIONS = subjectOptsFromDB;
+      }
+      if (CLASS_OPTIONS[0] !== '') CLASS_OPTIONS.unshift('');
+      if (SUBJECT_OPTIONS[0] !== '') SUBJECT_OPTIONS.unshift('');
+    }
+
+    async function saveOptionsToServer() {
+      let classOpts = editClassOptions.value.split(',').map(s => s.trim()).filter(Boolean);
+      let subjectOpts = editSubjectOptions.value.split(',').map(s => s.trim()).filter(Boolean);
+      classOpts.unshift('');
+      subjectOpts.unshift('');
+      CLASS_OPTIONS = classOpts;
+      SUBJECT_OPTIONS = subjectOpts;
+
+      await saveOptionsToDB(CLASS_OPTIONS, SUBJECT_OPTIONS);
+
+      showToast("Pilihan dropdown telah disimpan!");
+
+      showLoading("Menjana semula jadual...");
+      tableHeader.innerHTML = '<th class="w-28 p-2 text-sm font-bold border-2 border-black uppercase">HARI / WAKTU</th>';
+      tableBody.innerHTML = '';
+      initTableStructure();
+      renderSchedule(currentSchedule, archiveViewIndex !== -1);
+      applyMaintenanceToTable();
+      hideLoading();
+    }
+
+    function initDropdownEditors() {
+      editClassOptions.value = CLASS_OPTIONS.filter(opt => opt !== '').join(',');
+      editSubjectOptions.value = SUBJECT_OPTIONS.filter(opt => opt !== '').join(',');
+      weekLabelInput.value = currentWeekLabel || '';
+    }
+
+    // ==== TABLE STRUCTURE ====
+    function createDropdown(type, day, period) {
+      const select = document.createElement("select");
+      select.className = "w-full p-1 border-0 rounded-md shadow-sm focus:ring-1 focus:ring-blue-500 transition-all duration-200 mb-1";
+      select.dataset.type = type;
+      select.dataset.day = day;
+      select.dataset.period = period;
+
+      const options = type === 'class' ? CLASS_OPTIONS : SUBJECT_OPTIONS;
+      const colors = type === 'class' ? CLASS_COLORS : SUBJECT_COLORS;
+
+      options.forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt;
+        option.textContent = opt;
+        if (opt && colors[opt]) {
+          option.style.backgroundColor = colors[opt];
+        } else if (!opt) {
+          option.style.backgroundColor = DEFAULT_BG;
+        }
+        select.appendChild(option);
+      });
+
+      return select;
+    }
+
+    function initTableStructure() {
+      PERIOD_TIMES.forEach((time, index) => {
+        const th = document.createElement("th");
+        th.className = "p-2 text-xs font-semibold border-2 border-black tracking-wider bg-teal-600";
+        th.innerHTML = `<div class="font-bold text-white">W${index + 1}</div><div class="font-normal text-teal-100">${time}</div>`;
+        tableHeader.appendChild(th);
+      });
+
+      // Isi pilihan W1..W12 untuk maintenance
+      if (maintenancePeriodSelect) {
+        maintenancePeriodSelect.innerHTML = "";
+        for (let i = 1; i <= PERIODS_COUNT; i++) {
+          const opt = document.createElement("option");
+          opt.value = String(i);
+          opt.textContent = `W${i}`;
+          maintenancePeriodSelect.appendChild(opt);
+        }
+      }
+
+      Object.keys(DAYS_MAP).forEach(dayKey => {
+        const day = DAYS_MAP[dayKey];
+        const tr = document.createElement("tr");
+        tr.className = day.bg;
+
+        const th = document.createElement("th");
+        th.className = "p-2 text-lg sm:text-xl font-bold border-2 border-black text-gray-800 print-day-header";
+        th.textContent = day.label;
+        tr.appendChild(th);
+
+        for (let i = 1; i <= PERIODS_COUNT; i++) {
+          const td = document.createElement("td");
+          td.className = "p-1 h-20 border-2 border-black bg-white";
+          td.dataset.day = dayKey;
+          td.dataset.period = i;
+
+          const classSelect = createDropdown('class', dayKey, i);
+          const subjectSelect = createDropdown('subject', dayKey, i);
+
+          const printValueClass = document.createElement("span");
+          printValueClass.className = "print-value print-class-value";
+
+          const printValueSubject = document.createElement("span");
+          printValueSubject.className = "print-value print-subject-value";
+
+          td.appendChild(classSelect);
+          td.appendChild(subjectSelect);
+          td.appendChild(printValueClass);
+          td.appendChild(printValueSubject);
+
+          tr.appendChild(td);
+        }
+        tableBody.appendChild(tr);
+      });
+    }
+
+    // ==== RENDERING ====
+    function renderWeekDate() {
+      if (!currentWeekStart) {
+        currentWeekStart = getDefaultWeekStart();
+      }
+      const startDate = currentWeekStart.format("D");
+      const endDate = currentWeekStart.add(4, 'day').format("D MMM YYYY").toUpperCase();
+      weekDateDisplay.textContent = `TARIKH: ${startDate} - ${endDate}`;
+    }
+
+    function migrateScheduleData(data) {
+      if (!data) return createEmptySchedule();
+      const firstDayKey = Object.keys(DAYS_MAP)[0];
+      const firstCellData = data[firstDayKey] ? data[firstDayKey]['1'] : null;
+
+      if (firstCellData && typeof firstCellData === 'string') {
+        const newSchedule = createEmptySchedule();
+        Object.keys(DAYS_MAP).forEach(dayKey => {
+          for (let i = 1; i <= PERIODS_COUNT; i++) {
+            const oldVal = data[dayKey]?.[i] || '';
+            if (CLASS_OPTIONS.includes(oldVal)) {
+              newSchedule[dayKey][i] = { class: oldVal, subject: '' };
+            } else if (SUBJECT_OPTIONS.includes(oldVal)) {
+              newSchedule[dayKey][i] = { class: '', subject: oldVal };
+            } else if (oldVal) {
+              newSchedule[dayKey][i] = { class: 'Other', subject: 'Other' };
+            } else {
+              newSchedule[dayKey][i] = { class: '', subject: '' };
+            }
+          }
+        });
+        return newSchedule;
+      }
+      return data || createEmptySchedule();
+    }
+
+    function renderSchedule(data, isArchive = false) {
+      const schedule = data || createEmptySchedule();
+
+      Object.keys(DAYS_MAP).forEach(dayKey => {
+        for (let i = 1; i <= PERIODS_COUNT; i++) {
+          const cell = tableBody.querySelector(`td[data-day='${dayKey}'][data-period='${i}']`);
+          if (!cell) continue;
+
+          const classSelect = cell.querySelector("select[data-type='class']");
+          const subjectSelect = cell.querySelector("select[data-type='subject']");
+          const printClassVal = cell.querySelector(".print-class-value");
+          const printSubjectVal = cell.querySelector(".print-subject-value");
+
+          let cellData = schedule[dayKey] ? schedule[dayKey][i] : null;
+
+          if (typeof cellData === 'string') {
+            if (CLASS_OPTIONS.includes(cellData)) {
+              cellData = { class: cellData, subject: '' };
+            } else if (SUBJECT_OPTIONS.includes(cellData)) {
+              cellData = { class: '', subject: cellData };
+            } else {
+              cellData = { class: '', subject: '' };
+            }
+          } else if (!cellData || typeof cellData.class === 'undefined') {
+            cellData = { class: '', subject: '' };
+          }
+
+          classSelect.value = cellData.class || '';
+          subjectSelect.value = cellData.subject || '';
+
+          printClassVal.textContent = cellData.class || '';
+          printSubjectVal.textContent = cellData.subject || '';
+
+          applySelectColor(classSelect);
+          applySelectColor(subjectSelect);
+
+          classSelect.disabled = isArchive;
+          subjectSelect.disabled = isArchive;
+          if (isArchive) {
+            classSelect.classList.add("cursor-not-allowed");
+            subjectSelect.classList.add("cursor-not-allowed");
+          } else {
+            classSelect.classList.remove("cursor-not-allowed");
+            subjectSelect.classList.remove("cursor-not-allowed");
+          }
+        }
+      });
+
+      applyMaintenanceToTable();
+    }
+
+    async function saveScheduleToServer(showMessage = true) {
+      try {
+        await saveScheduleToDB(currentSchedule);
+        if (showMessage) showToast("Jadual disimpan!");
+      } catch (e) {
+        console.error(e);
+        showToast("Gagal menyimpan jadual ke server.", true);
+      }
+    }
+
+    // ==== MAINTENANCE ====
+    function applyMaintenanceToTable() {
+      if (!maintenance || !tableBody) return;
+
+      Object.keys(DAYS_MAP).forEach(dayKey => {
+        for (let i = 1; i <= PERIODS_COUNT; i++) {
+          const cell = tableBody.querySelector(`td[data-day='${dayKey}'][data-period='${i}']`);
+          if (!cell) continue;
+          const classSelect = cell.querySelector("select[data-type='class']");
+          const subjectSelect = cell.querySelector("select[data-type='subject']");
+          const isDisabled = maintenance[dayKey] && maintenance[dayKey][i];
+
+          if (isDisabled) {
+            cell.classList.add("bg-gray-300", "opacity-70");
+            if (classSelect) {
+              classSelect.disabled = true;
+              classSelect.classList.add("cursor-not-allowed");
+            }
+            if (subjectSelect) {
+              subjectSelect.disabled = true;
+              subjectSelect.classList.add("cursor-not-allowed");
+            }
+          } else {
+            cell.classList.remove("bg-gray-300", "opacity-70");
+            if (archiveViewIndex === -1) {
+              if (classSelect) {
+                classSelect.disabled = false;
+                classSelect.classList.remove("cursor-not-allowed");
+              }
+              if (subjectSelect) {
+                subjectSelect.disabled = false;
+                subjectSelect.classList.remove("cursor-not-allowed");
+              }
+            }
+          }
+        }
+      });
+    }
+
+    async function saveMaintenanceToServer() {
+      await saveMaintenanceToDB(maintenance);
+    }
+
+    function updateMaintenanceStatusText() {
+      if (!maintenanceStatusText) return;
+      const lines = [];
+      Object.keys(DAYS_MAP).forEach(dayKey => {
+        const periods = maintenance[dayKey] ? Object.keys(maintenance[dayKey]).filter(p => maintenance[dayKey][p]) : [];
+        if (periods.length > 0) {
+          const label = DAYS_MAP[dayKey].label;
+          const list = periods.map(p => `W${p}`).join(", ");
+          lines.push(`${label}: ${list}`);
+        }
+      });
+      if (lines.length === 0) {
+        maintenanceStatusText.textContent = "Tiada slot maintenance (semua aktif).";
+      } else {
+        maintenanceStatusText.textContent = "Slot dalam maintenance:\n" + lines.join("\n");
+      }
+    }
+
+    // ==== ADMIN MODAL ====
+    function openAdminModal() {
+      adminModal.style.display = 'flex';
+      adminPassword.value = '';
+      loginError.style.display = 'none';
+      loginView.style.display = 'block';
+      adminPanelView.style.display = 'none';
+      adminPassword.focus();
+    }
+
+    function closeAdminModal() {
+      adminModal.style.display = 'none';
+    }
+
+    function handleAdminLogin() {
+      if (adminPassword.value === ADMIN_PASS) {
+        loginView.style.display = 'none';
+        adminPanelView.style.display = 'block';
+        renderArchiveList();
+        initDropdownEditors();
+        updateMaintenanceStatusText();
+        if (archiveCommentText) {
+          archiveCommentText.textContent = "Tiada arkib dipilih.";
+        }
+      } else {
+        loginError.style.display = 'block';
+      }
+    }
+
+    // ==== ARKIB ====
+    function renderArchiveList() {
+      if (!weeklyArchive || weeklyArchive.length === 0) {
+        archiveListContainer.innerHTML = '<p class="text-gray-500">Tiada arkib ditemui.</p>';
+        if (archiveCommentText) {
+          archiveCommentText.textContent = "Tiada arkib dipilih.";
+        }
+        return;
+      }
+      archiveListContainer.innerHTML = '';
+      weeklyArchive.forEach((entry, index) => {
+        const div = document.createElement("div");
+        div.className = "flex justify-between items-center p-2 rounded-lg hover:bg-gray-100";
+
+        const label = document.createElement("span");
+        const weekLabel = entry.weekLabel ? ` (${entry.weekLabel})` : '';
+        label.textContent = `${entry.label}${weekLabel}`;
+        label.className = "font-medium text-gray-700";
+        div.appendChild(label);
+
+        const btnGroup = document.createElement("div");
+        btnGroup.className = "flex gap-2";
+
+        const viewBtn = document.createElement("button");
+        viewBtn.textContent = "Lihat";
+        viewBtn.className = "text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600";
+        viewBtn.onclick = () => viewArchiveWeek(index);
+        btnGroup.appendChild(viewBtn);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "Padam";
+        deleteBtn.className = "text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600";
+        deleteBtn.onclick = () => deleteArchiveEntry(index);
+        btnGroup.appendChild(deleteBtn);
+
+        div.appendChild(btnGroup);
+        archiveListContainer.appendChild(div);
+      });
+    }
+
+    async function deleteArchiveEntry(index) {
+      if (!weeklyArchive[index]) return;
+      if (confirm(`Anda pasti mahu padam arkib "${weeklyArchive[index].label}"?`)) {
+        weeklyArchive.splice(index, 1);
+        await saveArchiveToDB(weeklyArchive);
+        renderArchiveList();
+        showToast("Arkib telah dipadam.", true);
+        updateArchiveNav();
+      }
+    }
+
+    function viewArchiveWeek(index) {
+      archiveViewIndex = index;
+      const entry = weeklyArchive[index];
+      renderSchedule(entry.schedule, true);
+
+      const startDate = dayjs(entry.startDate).format("D");
+      const endDate = dayjs(entry.startDate).add(4, 'day').format("D MMM YYYY").toUpperCase();
+      weekDateDisplay.textContent = `ARKIB: ${startDate} - ${endDate}`;
+
+      if (archiveCommentText) {
+        archiveCommentText.textContent = formatArchiveComments(entry);
+      }
+
+      updateArchiveNav();
+    }
+
+    function navigateArchive(direction) {
+      let newIndex = archiveViewIndex + direction;
+
+      if (newIndex > weeklyArchive.length - 1) newIndex = weeklyArchive.length - 1;
+      if (newIndex < -1) newIndex = -1;
+
+      if (newIndex === archiveViewIndex) return;
+
+      archiveViewIndex = newIndex;
+
+      if (archiveViewIndex === -1) {
+        renderSchedule(currentSchedule, false);
+        renderWeekDate();
+        if (archiveCommentText) {
+          archiveCommentText.textContent = "Tiada arkib dipilih.";
+        }
+      } else {
+        const entry = weeklyArchive[archiveViewIndex];
+        renderSchedule(entry.schedule, true);
+        const startDate = dayjs(entry.startDate).format("D");
+        const endDate = dayjs(entry.startDate).add(4, 'day').format("D MMM YYYY").toUpperCase();
+        weekDateDisplay.textContent = `ARKIB: ${startDate} - ${endDate}`;
+        if (archiveCommentText) {
+          archiveCommentText.textContent = formatArchiveComments(entry);
+        }
+      }
+      updateArchiveNav();
+    }
+
+    function updateArchiveNav() {
+      if (archiveViewIndex <= -1) {
+        archiveNextBtn.disabled = true;
+        archiveNextBtn.classList.add("opacity-50", "cursor-not-allowed");
+      } else {
+        archiveNextBtn.disabled = false;
+        archiveNextBtn.classList.remove("opacity-50", "cursor-not-allowed");
+      }
+
+      if (archiveViewIndex >= weeklyArchive.length - 1) {
+        archivePrevBtn.disabled = true;
+        archivePrevBtn.classList.add("opacity-50", "cursor-not-allowed");
+      } else {
+        archivePrevBtn.disabled = false;
+        archivePrevBtn.classList.remove("opacity-50", "cursor-not-allowed");
+      }
+
+      if (archiveViewIndex === -1) {
+        archiveStatus.textContent = currentWeekLabel || "Minggu Semasa";
+      } else if (weeklyArchive[archiveViewIndex]) {
+        const e = weeklyArchive[archiveViewIndex];
+        archiveStatus.textContent = e.weekLabel || e.label;
+      } else {
+        archiveStatus.textContent = currentWeekLabel || "Minggu Semasa";
+        archiveViewIndex = -1;
+      }
+    }
+
+    // ==== ROLLOVER (Sabtu + manual) ====
+    async function handleRollover(isManual) {
+      if (!currentWeekStart) {
+        currentWeekStart = getDefaultWeekStart();
+      }
+
+      const startDateLabel = currentWeekStart.format("D MMM");
+      const endDateLabel = currentWeekStart.add(4, 'day').format("D MMM YYYY");
+      const archiveLabel = `Minggu ${startDateLabel} - ${endDateLabel}`;
+
+      const archiveEntry = {
+        id: new Date().toISOString(),
+        label: archiveLabel,
+        weekLabel: currentWeekLabel || '',
+        startDate: currentWeekStart.format("YYYY-MM-DD"),
+        schedule: currentSchedule,
+        comments: Array.isArray(currentWeekComments) ? currentWeekComments : []
+      };
+
+      weeklyArchive.unshift(archiveEntry);
+      await saveArchiveToDB(weeklyArchive);
+
+      currentSchedule = createEmptySchedule();
+      await saveScheduleToServer(false);
+
+      currentWeekStart = currentWeekStart.add(7, 'days');
+      await saveWeekStartToDB(currentWeekStart.format("YYYY-MM-DD"));
+
+      currentWeekLabel = '';
+      await saveWeekLabelToDB(currentWeekLabel);
+
+      currentWeekComments = [];
+      await saveWeekCommentsToDB(currentWeekComments);
+      renderWeekCommentsLog();
+      if (weekCommentTextInput) weekCommentTextInput.value = '';
+
+      renderWeekDate();
+      renderSchedule(currentSchedule, false);
+      updateArchiveNav();
+
+      if (archiveCommentText) {
+        archiveCommentText.textContent = "Tiada arkib dipilih.";
+      }
+
+      if (isManual) {
+        showToast("Jadual telah diarkib & minggu baru dimulakan!");
+        closeAdminModal();
+      }
+    }
+
+    async function checkWeeklyRollover(initialLastRolloverStr) {
+      const today = dayjs();
+      if (today.day() !== 6) return; // Sabtu
+
+      let lastRoll = initialLastRolloverStr ? dayjs(initialLastRolloverStr) : null;
+
+      if (!lastRoll || lastRoll.isBefore(today, 'day')) {
+        if (!currentWeekStart) currentWeekStart = getDefaultWeekStart();
+        if (currentWeekStart.isBefore(today, 'day')) {
+          showLoading("Memulakan minggu baru...");
+          await handleRollover(false);
+          await saveLastRolloverDateToDB(today.format("YYYY-MM-DD"));
+          hideLoading();
+          showToast("Minggu baru telah dimulakan (auto Sabtu)!");
+        }
+      }
+    }
+
+    // ==== EKSPORT, COPY & CETAK ====
+    function getDisplayedScheduleData() {
+      if (archiveViewIndex === -1) {
+        return currentSchedule;
+      }
+      return weeklyArchive[archiveViewIndex]?.schedule || currentSchedule;
+    }
+
+    function exportCSV() {
+      const data = getDisplayedScheduleData();
+      if (!data) {
+        showToast("Tiada data untuk dieksport.", true);
+        return;
+      }
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "Hari/Waktu," + PERIOD_TIMES.map((time, i) => `W${i + 1} (${time})`).join(",") + "\r\n";
+
+      Object.keys(DAYS_MAP).forEach(dayKey => {
+        const dayLabel = DAYS_MAP[dayKey].label;
+        const row = [dayLabel];
+        for (let i = 1; i <= PERIODS_COUNT; i++) {
+          const cellData = data[dayKey]?.[i] || { class: '', subject: '' };
+          const cellValue = `${cellData.class || ''} / ${cellData.subject || ''}`;
+          row.push(`"${cellValue.replace(/"/g, '""')}"`);
+        }
+        csvContent += row.join(",") + "\r\n";
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `jadual_makmal_${dayjs().format("YYYYMMDD")}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast("CSV dimuat turun!");
+    }
+
+    function exportXLSX() {
+      const data = getDisplayedScheduleData();
+      if (!data) {
+        showToast("Tiada data untuk dieksport.", true);
+        return;
+      }
+      const wb = XLSX.utils.book_new();
+      const ws_data = [];
+
+      const header = ["Hari/Waktu"];
+      PERIOD_TIMES.forEach((time, i) => {
+        header.push(`W${i + 1} (${time})`);
+      });
+      ws_data.push(header);
+
+      Object.keys(DAYS_MAP).forEach(dayKey => {
+        const dayLabel = DAYS_MAP[dayKey].label;
+        const row = [dayLabel];
+        for (let i = 1; i <= PERIODS_COUNT; i++) {
+          const cellData = data[dayKey]?.[i] || { class: '', subject: '' };
+          const cellValue = `${cellData.class || ''}\n${cellData.subject || ''}`.trim();
+          row.push(cellValue);
+        }
+        ws_data.push(row);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(ws_data);
+      const cols = [{ wch: 15 }];
+      for (let i = 1; i <= PERIODS_COUNT; i++) cols.push({ wch: 15 });
+      ws['!cols'] = cols;
+
+      XLSX.utils.book_append_sheet(wb, ws, "Jadual Makmal");
+      XLSX.writeFile(wb, `jadual_makmal_${dayjs().format("YYYYMMDD")}.xlsx`);
+      showToast("Excel dimuat turun!");
+    }
+
+    async function copyTableToClipboard() {
+      const data = getDisplayedScheduleData();
+      if (!data) {
+        showToast("Tiada data untuk disalin.", true);
+        return;
+      }
+
+      const lines = [];
+      const header = ["Hari/Waktu"].concat(
+        PERIOD_TIMES.map((time, i) => `W${i + 1} (${time})`)
+      );
+      lines.push(header.join(" | "));
+
+      Object.keys(DAYS_MAP).forEach(dayKey => {
+        const dayLabel = DAYS_MAP[dayKey].label;
+        const row = [dayLabel];
+        for (let i = 1; i <= PERIODS_COUNT; i++) {
+          const cellData = data[dayKey]?.[i] || { class: '', subject: '' };
+          const cellValue = `${cellData.class || ''}${cellData.subject ? '/' + cellData.subject : ''}`;
+          row.push(cellValue || "-");
+        }
+        lines.push(row.join(" | "));
+      });
+
+      const text = lines.join("\n");
+
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const textarea = document.createElement("textarea");
+          textarea.value = text;
+          textarea.style.position = "fixed";
+          textarea.style.top = "-1000px";
+          textarea.style.left = "-1000px";
+          document.body.appendChild(textarea);
+          textarea.focus();
+          textarea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textarea);
+        }
+        showToast("Jadual telah disalin ke clipboard!");
+      } catch (err) {
+        console.error(err);
+        showToast("Gagal menyalin jadual.", true);
+      }
+    }
+
+    // ==== EVENT LISTENERS ====
+    function initEventListeners() {
+      tableBody.addEventListener("change", (event) => {
+        if (event.target && event.target.tagName === 'SELECT') {
+          applySelectColor(event.target);
+          clearTimeout(autoSaveTimer);
+          updateScheduleDataFromTable();
+          autoSaveTimer = setTimeout(() => {
+            saveScheduleToServer(false);
+          }, 500);
+        }
+      });
+
+      adminLoginBtn.addEventListener("click", openAdminModal);
+      adminCancelBtn.addEventListener("click", closeAdminModal);
+      adminCloseBtn.addEventListener("click", closeAdminModal);
+      adminSubmitBtn.addEventListener("click", handleAdminLogin);
+
+      archivePrevBtn.addEventListener("click", () => navigateArchive(1));
+      archiveNextBtn.addEventListener("click", () => navigateArchive(-1));
+
+      // Toggle panel komen
+      toggleCommentsBtn.addEventListener("click", () => {
+        commentsPanel.classList.toggle("hidden");
+      });
+
+      // Hantar chat komen
+      sendCommentBtn.addEventListener("click", async () => {
+        const name = (weekCommentNameInput.value || '').trim() || 'Guru';
+        const text = (weekCommentTextInput.value || '').trim();
+
+        if (!text) {
+          alert("Sila tulis komen dahulu.");
+          return;
+        }
+
+        const msg = {
+          id: Date.now(),
+          name,
+          text,
+          time: new Date().toISOString()
+        };
+        currentWeekComments.push(msg);
+        await saveWeekCommentsToDB(currentWeekComments);
+        renderWeekCommentsLog();
+        weekCommentTextInput.value = '';
+        showToast("Komen dihantar!");
+      });
+
+      // Enter + Ctrl+Enter untuk hantar
+      weekCommentTextInput.addEventListener("keydown", async (e) => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          sendCommentBtn.click();
+        }
+      });
+
+      // Maintenance toggle
+      maintenanceToggleBtn.addEventListener("click", async () => {
+        const day = maintenanceDaySelect.value;
+        const period = parseInt(maintenancePeriodSelect.value, 10);
+
+        if (!maintenance[day]) maintenance[day] = {};
+        const currentlyDisabled = !!maintenance[day][period];
+        if (currentlyDisabled) {
+          delete maintenance[day][period];
+        } else {
+          maintenance[day][period] = true;
+        }
+
+        applyMaintenanceToTable();
+        updateMaintenanceStatusText();
+        await saveMaintenanceToServer();
+        showToast(currentlyDisabled ? "Slot dibuka semula." : "Slot ditutup (maintenance).");
+      });
+    }
+
+    function updateScheduleDataFromTable() {
+      const newSchedule = createEmptySchedule();
+      Object.keys(DAYS_MAP).forEach(dayKey => {
+        for (let i = 1; i <= PERIODS_COUNT; i++) {
+          const cell = tableBody.querySelector(`td[data-day='${dayKey}'][data-period='${i}']`);
+          if (!cell) continue;
+          const classVal = cell.querySelector("select[data-type='class']").value;
+          const subjectVal = cell.querySelector("select[data-type='subject']").value;
+          newSchedule[dayKey][i] = { class: classVal, subject: subjectVal };
+        }
+      });
+      currentSchedule = newSchedule;
+    }
+
+    function initAdminPanel() {
+      saveBtn.addEventListener("click", () => {
+        updateScheduleDataFromTable();
+        saveScheduleToServer(true);
+      });
+
+      printBtn.addEventListener("click", printSchedule);
+      csvBtn.addEventListener("click", exportCSV);
+      excelBtn.addEventListener("click", exportXLSX);
+      copyTableBtn.addEventListener("click", copyTableToClipboard);
+
+      adminClearBtn.addEventListener("click", async () => {
+        if (confirm("Anda pasti mahu kosongkan semua data jadual minggu ini? Tindakan ini tidak boleh diundur.")) {
+          currentSchedule = createEmptySchedule();
+          await saveScheduleToServer(false);
+          renderSchedule(currentSchedule, false);
+          showToast("Jadual minggu ini telah dikosongkan.", true);
+        }
+      });
+
+      adminRolloverBtn.addEventListener("click", async () => {
+        if (confirm("Anda pasti mahu simpan jadual ini ke arkib dan mulakan minggu baru?")) {
+          await handleRollover(true);
+        }
+      });
+
+      manualDateBtn.addEventListener("click", async () => {
+        const newDate = manualDateInput.value;
+        if (newDate) {
+          let newStartDate = dayjs(newDate);
+          if (newStartDate.day() !== 1) {
+            newStartDate = newStartDate.isoWeekday(1);
+            alert("Tarikh telah ditetapkan ke hari Isnin minggu tersebut.");
+          }
+          currentWeekStart = newStartDate;
+          await saveWeekStartToDB(currentWeekStart.format("YYYY-MM-DD"));
+          renderWeekDate();
+          showToast("Tarikh minggu semasa telah ditukar.");
+          closeAdminModal();
+        }
+      });
+
+      saveOptionsBtn.addEventListener("click", async () => {
+        if (confirm("Menyimpan pilihan baru akan menjana semula jadual. Anda pasti?")) {
+          await saveOptionsToServer();
+        }
+      });
+
+      weekLabelSaveBtn.addEventListener("click", async () => {
+        currentWeekLabel = weekLabelInput.value.trim();
+        await saveWeekLabelToDB(currentWeekLabel);
+        updateArchiveNav();
+        showToast("Label minggu telah disimpan!");
+      });
+    }
+
+    // ==== INIT APP ====
+    async function init() {
+      showLoading("Memuatkan data...");
+      try {
+        const initial = await loadInitialData();
+
+        loadOptionsFromData(initial.classOptions, initial.subjectOptions);
+        initTableStructure();
+
+        weeklyArchive = Array.isArray(initial.archive) ? initial.archive : [];
+        renderArchiveList();
+
+        if (initial.weekStart) {
+          currentWeekStart = dayjs(initial.weekStart);
+        } else {
+          currentWeekStart = getDefaultWeekStart();
+          await saveWeekStartToDB(currentWeekStart.format("YYYY-MM-DD"));
+        }
+
+        currentWeekLabel = initial.weekLabel || '';
+        if (initial.lastRolloverDate) {
+          lastRolloverDate = dayjs(initial.lastRolloverDate);
+        }
+
+        currentSchedule = migrateScheduleData(initial.schedule);
+        renderWeekDate();
+        renderSchedule(currentSchedule, false);
+        updateArchiveNav();
+
+        maintenance = initial.maintenance && typeof initial.maintenance === 'object'
+          ? initial.maintenance
+          : createEmptyMaintenance();
+        applyMaintenanceToTable();
+        updateMaintenanceStatusText();
+
+        // Chat minggu semasa
+        currentWeekComments = Array.isArray(initial.weekComments) ? initial.weekComments : [];
+        renderWeekCommentsLog();
+
+        if (archiveCommentText) {
+          archiveCommentText.textContent = "Tiada arkib dipilih.";
+        }
+
+        initEventListeners();
+        initAdminPanel();
+
+        await checkWeeklyRollover(initial.lastRolloverDate);
+      } catch (e) {
+        console.error(e);
+        showToast("Ralat memuatkan data dari server.", true);
+      } finally {
+        hideLoading();
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
